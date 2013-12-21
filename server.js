@@ -1,3 +1,8 @@
+/**
+ * @file server.js
+ * @brief サーバ側システムメイン
+ */
+
 // Dependencies
 var express = require('express');
 var app = express();
@@ -13,14 +18,22 @@ app.configure(function () {
   app.use(express.static(__dirname + '/public'));
   app.use(express.bodyParser()); // req.bodyを生成させるために必要
 });
+
+/*
+ * HTML ページ出力
+ */
+
+/**
+ * @brief indexページの取得
+ */
 app.get('/', function(req, res) {
-  console.log('---- / get -------------------------------------------------');
   res.render('index.ejs');
 });
-app.post('/room', function(req, res) {
-  console.log('---- /room post --------------------------------------------');
-  // console.log(req.body);
 
+/**
+ * @brief roomページの取得
+ */
+app.post('/room', function(req, res) {
   // ユーザ一覧への登録
   // (各ユーザのuser_idから参加中のroom_id等が引けるようにする)
   var nickname = req.body.nickname;
@@ -47,8 +60,11 @@ app.post('/room', function(req, res) {
 
   res.render('room.ejs', {locals: {room: g_rooms[room_id], user: g_users[user_id]}});
 });
+
+/**
+ * @brief playページの取得
+ */
 app.post('/play', function(req, res) {
-  console.log('---- /play post --------------------------------------------');
   var user_id = req.body.user_id;
   var user = g_users[user_id];
   var room_id = user.room_id;
@@ -83,22 +99,29 @@ app.post('/play', function(req, res) {
   notify_user_update(room_id);
   res.render('play.ejs', {locals: {room: g_rooms[room_id], user: g_users[user_id]}});
 });
+
 // app.listenではなく、server.listenにする。
 // (パス/socket.io/でjsが読めなくなる)
 server.listen(3000);
 console.log('server start:', 3000);
 
-var games = {};
-
+/**
+ * @fn notify_room_update
+ * @brief 各ユーザにルームの更新を通知
+ */
 function notify_room_update() {
   var roomlist = [];
   for (var room_id in g_rooms) {
     roomlist.push({room_id: room_id, room_name: g_rooms[room_id].room_name});
   }
-  console.log(roomlist);
   io.sockets.emit('update_room', roomlist);
 }
 
+/**
+ * @fn notify_user_update
+ * @brief 各ユーザに同一ルーム内のユーザの更新を通知
+ * @param room_id   [in] 通知するルームのID
+ */
 function notify_user_update(room_id) {
   var room = g_rooms[room_id];
   var user_states = [];
@@ -114,6 +137,12 @@ function notify_user_update(room_id) {
   io.sockets.in(room_id).emit('update_user', user_states)
 }
 
+/**
+ * @fn make_card_update
+ * @brief update_card用の送信データを作成
+ * @param game            [in] 対象ゲーム
+ * @param card_ids_dict   [in] カードIDをキーにしたディクショナリ
+ */
 function make_card_update(game, card_ids_dict) {
   var cards = [];
   for (var card_id in card_ids_dict) {
@@ -136,92 +165,111 @@ io.sockets.on('connection', function(socket) {
    * @brief クライアントがindexページに遷移したことを受信
    */
   socket.on('enter_index', function() {
-    console.log('---- enter_index -------------------------------------------');
-
     // ユーザIDを生成して通知する
     socket.emit('create_user_id', socket.id);
     notify_room_update();
     socket.emit('add_message', {name: "system", message: "welcome to online とらんぷ!", clear: true});
   });
 
+  /**
+   * @fn socket.on.enter_room
+   * @brief クライアントがroomページに遷移したことを受信
+   */
   socket.on('enter_room', function(user_id) {
-    console.log('---- enter_room --------------------------------------------');
     if(g_users[user_id] == undefined) return; // 無効ユーザのリクエストは拒否
+
     var room_id = g_users[user_id].room_id;
     socket.join(room_id);
     notify_user_update(room_id);
   });
 
-  socket.on('start_play', function(user_id) {
-    console.log('---- start_play --------------------------------------------');
+  /**
+   * @fn socket.on.enter_play
+   * @brief クライアントがplayページに遷移したことを受信
+   */
+  socket.on('enter_play', function(user_id) {
     if(g_users[user_id] == undefined) return; // 無効ユーザのリクエストは拒否
+
     var room_id = g_users[user_id].room_id;
     socket.join(room_id);
     var game = g_rooms[room_id].game;
     if(game == null) return;
-    socket.emit('card_update', make_card_update(game, game.cardset));
+    socket.emit('update_card', make_card_update(game, game.cardset));
     notify_user_update(room_id);
   });
 
-  socket.on('card_click', function(params) {
-    console.log('---- card_click --------------------------------------------');
-    console.log(params);
+  /**
+   * @fn socket.on.click_card
+   * @brief カードがクリックされたときの処理
+   */
+  socket.on('click_card', function(params) {
     var user_id = params.user_id;
     if(g_users[user_id] == undefined) return; // 無効ユーザのリクエストは拒否
+
     var room_id = g_users[user_id].room_id;
     var game = g_rooms[room_id].game;
     if(game == null) return;
     var card = game.cardset[params.card_id];
+
     card.opened = !card.opened;
     var cards = {};
     cards[card.card_id] = null;
-    io.sockets.in(room_id).emit('card_update', make_card_update(game, cards));
+    io.sockets.in(room_id).emit('update_card', make_card_update(game, cards));
   });
 
-  socket.on('card_pick', function(params) {
-    console.log('---- card_pick ---------------------------------------------');
-    console.log(params);
+  /**
+   * @fn socket.on.pick_card
+   * @brief カードが移動中になったときの処理
+   */
+  socket.on('pick_card', function(params) {
     var user_id = params.user_id;
     if(g_users[user_id] == undefined) return; // 無効ユーザのリクエストは拒否
+
     var room_id = g_users[user_id].room_id;
     var game = g_rooms[room_id].game;
     if(game == null) return;
     var card = game.cardset[params.card_id];
+
     card.picker = user_id;
-    console.log(game.highest_z);
     card.z = ++game.highest_z;
     var cards = {};
     cards[card.card_id] = null;
-    io.sockets.in(room_id).emit('card_update', make_card_update(game, cards));
-    console.log("emit!");
+    io.sockets.in(room_id).emit('update_card', make_card_update(game, cards));
   });
 
-  socket.on('card_move', function(params) {
-    console.log('---- card_move ---------------------------------------------');
-    console.log(params);
+  /**
+   * @fn socket.on.move_card
+   * @brief カードが移動完了したときの処理
+   */
+  socket.on('move_card', function(params) {
     var user_id = params.user_id;
     if(g_users[user_id] == undefined) return; // 無効ユーザのリクエストは拒否
+
     var room_id = g_users[user_id].room_id;
     var game = g_rooms[room_id].game;
     if(game == null) return;
     var card = game.cardset[params.card_id];
+
     card.x = params.x;
     card.y = params.y;
     card.picker = null;
     var cards = {};
     cards[card.card_id] = null;
-    io.sockets.in(room_id).emit('card_update', make_card_update(game, cards));
-    console.log("emit!");
+    io.sockets.in(room_id).emit('update_card', make_card_update(game, cards));
   });
 
-  socket.on('sem_give', function(params) {
-    console.log('---- sem_give ----------------------------------------------');
-    console.log(params);
+  /**
+   * @fn socket.on.give_semaphore
+   * @brief ユーザが別ユーザにセマフォを渡したときの処理
+   */
+  socket.on('give_semaphore', function(params) {
     var user_id = params.user_id;
     if(g_users[user_id] == undefined) return; // 無効ユーザのリクエストは拒否
+
     var room_id = g_users[user_id].room_id;
     var game = g_rooms[room_id].game;
     if(game == null) return;
+
     var sem = game.semaphore;
     var index = sem.owner.indexOf(user_id);
     if (index < 0) return; // 現在のセマフォ所有者でないため無視
@@ -230,77 +278,5 @@ io.sockets.on('connection', function(socket) {
     notify_user_update(room_id);
   });
 });
-
-function validate_check(g, data) {
-  return (data.color === g.turn);
-}
-
-function init_game(g) {
-  g.grids = new Array(g.gridnum);
-  for(var x = 0; x < g.gridnum; x++) {
-    g.grids[x] = new Array(g.gridnum);
-    for(var y = 0; y < g.gridnum; y++) {
-      g.grids[x][y] = null;
-    }
-  }
-  g.grids[3][3] = "white";
-  g.grids[3][4] = "black";
-  g.grids[4][3] = "black";
-  g.grids[4][4] = "white";
-  g.turn = "black";
-  g.started = true;
-}
-
-function place(g, x, y){
-  console.log('place()')
-  if(x < 0 || x >= g.gridnum || y < 0 || y >= g.gridnum ||
-      g.grids[x][y] !== null || reverse(g, x, y, false) === 0){
-    return;
-  }
-  g.grids[x][y] = g.turn;
-  switch_turn(g);
-}
-
-function reverse(g, x, y, judge_only){
-  var sx, sy;
-  var totalnum = 0;
-  for(sy = -1; sy <= 1; ++sy){
-    for(sx = -1; sx <= 1; ++sx){
-      if(sx === 0 && sy === 0) continue;
-      var i = reverse_line(g, sx, sy, x, y, judge_only);
-      console.log("sx=" + sx + ",sy=" + sy + ",result=" + i);
-      totalnum += i;
-    }
-  }
-  return totalnum;
-}
-
-function reverse_line(g, sx, sy, x, y, judge_only){
-  var x2 = x + sx, y2 = y + sy;
-  var num = 0;
-  while(x2 >= 0 && x2 < g.gridnum && y2 >= 0 && y2 < g.gridnum){
-    if(g.grids[x2][y2] === null){
-      return 0;
-    }else if(g.grids[x2][y2] == g.turn){
-      if(!judge_only && num > 0){
-        while(x2 != x || y2 != y){
-          x2 -= sx;
-          y2 -= sy;
-          g.grids[x2][y2] = g.turn;
-        }
-      }
-      return num;
-    }else{
-      ++num;
-    }
-    x2 += sx;
-    y2 += sy;
-  }
-  return 0;
-}
-
-function switch_turn(g){
-  g.turn = (g.turn == "black") ? "white" : "black";
-}
 
 // vim: et sts=2 sw=2:

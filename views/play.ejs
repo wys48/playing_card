@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!--ルームページ-->
+<!--プレイページ-->
 <html>
 <head>
 <script src="http://ajax.googleapis.com/ajax/libs/jquery/1.8/jquery.min.js"></script>
@@ -16,13 +16,9 @@
   </canvas><br/>
   <h4>手札</h4>
   <form method="POST" id="form" action="/play">
-    <input type="hidden" name="room_id" id="room_id" value="<%= room.room_id %>">
     <input type="hidden" name="user_id" id="user_id" value="<%= user.user_id %>">
   </form>
   <h4>参加者一覧</h4>
   <ul id="users"></ul>
 </body>
 </html>
-<%
-// vim:ft=html
-%>
