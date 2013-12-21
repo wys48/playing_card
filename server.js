@@ -50,8 +50,8 @@ app.post('/room', function(req, res) {
 app.post('/play', function(req, res) {
   console.log('---- /play post --------------------------------------------');
   var user_id = req.body.user_id;
-  var room_id = req.body.room_id;
   var user = g_users[user_id];
+  var room_id = user.room_id;
   var room = g_rooms[room_id];
   if(room.game == null) {
     // ゲーム開始
@@ -111,7 +111,7 @@ function notify_user_update(room_id) {
     }
     user_states.push({nickname: u.nickname, state: u.state, sem_owner: is_owner, user_id: u.user_id});
   }
-  io.sockets.in(room_id).emit('user_update', user_states)
+  io.sockets.in(room_id).emit('update_user', user_states)
 }
 
 function make_card_update(game, card_ids_dict) {
