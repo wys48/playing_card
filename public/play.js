@@ -1,3 +1,7 @@
+/**
+ * @file play.js
+ * @brief ゲームプレイページのスクリプト(本システムのメイン)
+ */
 
 var g_cards = {};
 var g_refresh = false;
@@ -7,17 +11,126 @@ var g_dragging = null;
 var g_regions = {};
 var g_users = [];
 
-//--------------------------------------------------------------------------------
-// document.onload
-//
+/**
+ * @fn document.onload
+ */
 $(function () {
-  console.log('---- play.js -----------------------------------------------');
-  socket = io.connect();
+  var socket = io.connect();
+
+  /**
+   * @fn socket.on.connect
+   * @brief サーバとの接続完了
+   */
   socket.on('connect', function () {
-    console.log('socket: connected');
-    socket.emit('start_play', $("#user_id").val());
+    socket.emit('enter_play', $("#user_id").val()); //!< playページへ入ったことを通知
   });
 
+  /**
+   * @fn socket.on.update_card
+   * @brief カード更新
+   * @param cards   [in] カード情報 {card_id:, ...} の配列
+   */
+  socket.on('update_card', function (cards) {
+    for (var i in cards) {
+      var card = cards[i];
+      g_cards[card.card_id] = card;
+    }
+    g_refresh = true;
+  });
+
+  /**
+   * @fn socket.on.update_user
+   * @brief ユーザの更新
+   * @param users   [in] ユーザ情報 {nickname:, state:, ...} の配列
+   */
+  socket.on('update_user', function (users) {
+    var obj = $('#users')
+    obj.children().remove();
+    g_users = users;
+    for (var i = 0; i < users.length; ++i) {
+      var u = users[i];
+      obj.append($("<li>").text(u.nickname + " : " + u.state));
+    }
+    g_refresh = true;
+  });
+
+  /**
+   * @fn #main.mousedown
+   * @brief マウスダウンイベント処理
+   * @param event   [in] イベント情報
+   */
+  $("#main").mousedown(function(event){
+    if (hittest_user(event)) return;
+    var found = hittest_card(event);
+    if (found.card_id == null) return;
+    // ドラッグ操作開始
+    g_dragging = found;
+    // サーバへの移動開始通知
+    var user_id = $("#user_id").val();
+    socket.emit('pick_card', {user_id: user_id, card_id: g_dragging.card_id});
+  });
+
+  /**
+   * @fn #main.mousemove
+   * @brief マウス移動イベント処理
+   * @param event   [in] イベント情報
+   */
+  $("#main").mousemove(function(event){
+    if (g_dragging == null) return;
+    // ドラッグ中
+    var rect = event.target.getBoundingClientRect();
+    var mx = event.clientX - rect.left;
+    var my = event.clientY - rect.top;
+    var card = g_cards[g_dragging.card_id];
+    var region = g_regions.field;
+    card.dx = Math.min(Math.max(g_dragging.xoffset + mx, region.x), region.x + region.w - card.dw);
+    card.dy = Math.min(Math.max(g_dragging.yoffset + my, region.y), region.y + region.h - card.dh);
+    g_refresh = true;
+  });
+
+  /**
+   * @fn #main.mouseup
+   * @brief マウスアップイベント処理
+   * @param event   [in] イベント情報
+   */
+  $("#main").mouseup(function(event){
+    if (g_dragging == null) return;
+    // ドラッグ終了
+    var card = g_cards[g_dragging.card_id];
+    var user_id = $("#user_id").val();
+    socket.emit('move_card', {user_id: user_id, card_id: g_dragging.card_id, x: card.dx, y: card.dy});
+    g_dragging = null;
+  });
+
+  /**
+   * @fn #main.dblclk
+   * @brief ダブルクリックイベント処理
+   * @param event   [in] イベント情報
+   */
+  $("#main").dblclick(function(event){
+    var user_id = $("#user_id").val();
+    var found = hittest_card(event);
+    if (found.card_id == null) return;
+    socket.emit('click_card', {user_id: user_id, card_id: found.card_id});
+  });
+
+  /**
+   * @brief 定期処理(描画)
+   */
+  setInterval(function() {
+    if (g_refresh == false) return;
+    var canvas = $("#main")[0];
+    var context = canvas.getContext('2d');
+    draw_field(context);
+    draw_hands(context);
+    draw_users(context);
+    g_refresh = false;
+  }, 100);
+
+  /**
+   * @fn init_regions
+   * @brief 領域の初期化
+   */
   function init_regions() {
     var canvas = $("#main")[0];
     g_regions["users"] = {x: null, y: 0, w: 100, h: canvas.height};
@@ -31,14 +144,11 @@ $(function () {
 
   init_regions();
 
-  socket.on('card_update', function (cards) {
-    for (var i in cards) {
-      var card = cards[i];
-      g_cards[card.card_id] = card;
-    }
-    g_refresh = true;
-  });
-
+  /**
+   * @fn draw_field
+   * @brief 場を描画
+   * @param context   [in] Canvas context
+   */
   function draw_field(context) {
     var region = g_regions.field;
     context.save();
@@ -71,6 +181,11 @@ $(function () {
     context.restore();
   }
 
+  /**
+   * @fn draw_hands
+   * @brief 手札領域を描画
+   * @param context   [in] Canvas context
+   */
   function draw_hands(context) {
     var region = g_regions.hands;
     context.save();
@@ -80,6 +195,11 @@ $(function () {
     context.restore();
   }
 
+  /**
+   * @fn draw_users
+   * @brief 参加者リスト領域を描画
+   * @param context   [in] Canvas context
+   */
   function draw_users(context) {
     var region = g_regions.users;
     context.save();
@@ -107,16 +227,11 @@ $(function () {
     context.restore();
   }
 
-  setInterval(function() {
-    if (g_refresh == false) return;
-    var canvas = $("#main")[0];
-    var context = canvas.getContext('2d');
-    draw_field(context);
-    draw_hands(context);
-    draw_users(context);
-    g_refresh = false;
-  }, 100);
-
+  /**
+   * @fn hittest_card
+   * @brief クリック対象の判定(カード)
+   * @param event   [in] イベント情報
+   */
   function hittest_card(event){
     var rect = event.target.getBoundingClientRect();
     var mx = event.clientX - rect.left;
@@ -143,7 +258,12 @@ $(function () {
     return found;
   }
 
-  function hittest_users(event) {
+  /**
+   * @fn hittest_user
+   * @brief クリック対象の判定(ユーザ)
+   * @param event   [in] イベント情報
+   */
+  function hittest_user(event) {
     var rect = event.target.getBoundingClientRect();
     var region = g_regions.users;
     var mx = event.clientX - rect.left - region.x;
@@ -154,65 +274,11 @@ $(function () {
     var user = g_users[i];
     if (user != null) {
       var user_id = $("#user_id").val();
-      socket.emit('sem_give', {user_id: user_id, receiver_user_id: user.user_id});
+      socket.emit('give_semaphore', {user_id: user_id, receiver_user_id: user.user_id});
     }
     return true;
   }
 
-  $("#main").mousedown(function(event){
-    if (hittest_users(event)) return;
-    var found = hittest_card(event);
-    if (found.card_id == null) return;
-    // ドラッグ操作開始
-    g_dragging = found;
-    // サーバへの移動開始通知
-    var user_id = $("#user_id").val();
-    socket.emit('card_pick', {user_id: user_id, card_id: g_dragging.card_id});
-  });
-
-  $("#main").mousemove(function(event){
-    if (g_dragging == null) return;
-    // ドラッグ中
-    var rect = event.target.getBoundingClientRect();
-    var mx = event.clientX - rect.left;
-    var my = event.clientY - rect.top;
-    var card = g_cards[g_dragging.card_id];
-    var region = g_regions.field;
-    card.dx = Math.min(Math.max(g_dragging.xoffset + mx, region.x), region.x + region.w - card.dw);
-    card.dy = Math.min(Math.max(g_dragging.yoffset + my, region.y), region.y + region.h - card.dh);
-    g_refresh = true;
-  });
-
-  $("#main").mouseup(function(event){
-    if (g_dragging == null) return;
-    // ドラッグ終了
-    var card = g_cards[g_dragging.card_id];
-    var user_id = $("#user_id").val();
-    socket.emit('card_move', {user_id: user_id, card_id: g_dragging.card_id, x: card.dx, y: card.dy});
-    g_dragging = null;
-  });
-
-  $("#main").dblclick(function(event){
-    var user_id = $("#user_id").val();
-    var found = hittest_card(event);
-    if (found.card_id == null) return;
-    socket.emit('card_click', {user_id: user_id, card_id: found.card_id});
-  });
-
-  socket.on('user_update', function (users) {
-    console.log('---- user_update -------------------------------------------');
-    console.log(users);
-    var obj = $('#users')
-    obj.children().remove();
-    g_users = users;
-    for (var i = 0; i < users.length; ++i) {
-      var u = users[i];
-      obj.append($("<li>").text(u.nickname + " : " + u.state));
-    }
-    g_refresh = true;
-  });
-
 });
 
 // vim: et sts=2 sw=2:
-
