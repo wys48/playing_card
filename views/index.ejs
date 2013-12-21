@@ -13,11 +13,11 @@
   <form method="POST" id="form" action="/room">
     <label for="nickname">あなたのお名前：</label><input type="text" name="nickname" id="nickname" value="お名前"><br/>
     <select name="room_id" id="room_id", size="1">
-    <option value="">(新規ルームの作成)</option>
+    <option value=""></option>
     </select>
     <input type="hidden" name="user_id" id="user_id" value="">
-    <input type="submit" disabled id="enter" value="作成/参加">
+    <input type="button" id="enter" value="" style="display: none">
   </form>
-  <ul id="posts"></ul>
+  <ul id="messages"></ul>
 </body>
 </html>

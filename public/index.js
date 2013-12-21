@@ -1,36 +1,16 @@
-
-var gridsize = 50;
-var topmargin = 50;
-var leftmargin = 50;
-
-var gridnum = null; // 盤面の幅
-var socket = null;  // サーバとの接続
-var myself = null;  // 自分自身の色名称
-// var grids = null;    // 盤面の二次元配列
-var turn = null;
+/**
+ * @file index.js
+ * @brief 本システムの最初の入り口になるページのスクリプト
+ */
 
 var LOCALSTORAGE_NICKNAME = "playing_card.nickname";
 
-function ismyturn() {
-  return (myself !== null) && (myself === turn);
-}
-
-/// @function Sync.load
-/// Loads an resource
-/// @param {String} id the GUID of the resource
-/// @param {Function} success callback to be executed with the data on suceess
-/// @param {Function} error callback to be executed with error description in case of failure
-/// Loads an resource
-function makedata(data) {
-  data.color = myself;
-  data.timestamp = Date.now();
-  return data;
-}
-
-//--------------------------------------------------------------------------------
-// document.onload
-//
+/**
+ * @fn document.onload
+ */
 $(function () {
+  var socket = io.connect();
+
   if(window.localStorage) {
     // localStorageに保存されたニックネームを復元
     var name = window.localStorage.getItem(LOCALSTORAGE_NICKNAME);
@@ -39,56 +19,79 @@ $(function () {
     }
   }
 
-  socket = io.connect();
+  /**
+   * @fn socket.on.connect
+   * @brief サーバとの接続完了
+   */
   socket.on('connect', function () {
-    socket.emit('enter_index');
+    socket.emit('enter_index'); //!< indexページへ入ったことを通知
   });
 
-  socket.on('user_id', function (user_id) {
+  /**
+   * @fn socket.on.create_user_id
+   * @brief サーバから自分自身のユーザIDを受信
+   * @param user_id   [in] ユーザID
+   * @note ユーザIDはサーバが生成する
+   */
+  socket.on('create_user_id', function (user_id) {
     $('#user_id').val(user_id);
     $('#enter').attr('disabled', false);
   });
 
   /**
-   * @fn room_update
+   * @fn socket.on.update_room
    * @brief ルーム一覧の更新
+   * @param roomlist  [in] ルーム情報 {room_id:, room_name:} の配列
    */
-  function on_room_update() {}
-  socket.on('room_update', function (roomlist) {
+  socket.on('update_room', function (roomlist) {
     var obj = $('#room_id');
     obj.children().remove();
     obj.append($('<option>').val('').text('(新規ルーム)'));
     for (var i = 0; i < roomlist.length; ++i) {
       obj.append($('<option>').val(roomlist[i].room_id).text(roomlist[i].room_name));
     }
+    obj.change();
+    $('#enter').show();
   });
 
-  socket.on('post', function (post) {
+  /**
+   * @fn socket.on.add_message
+   * @brief メッセージエリアのテキスト受信
+   * @param post    [in] メッセージデータ {name:, message:, clear:}
+   */
+  socket.on('add_message', function (post) {
     if(post.clear === true) {
-      $('#posts').children().remove();
+      $('#messages').children().remove();
     }
-    var li = $('<li>').text(post.name + ': ' + post.message + ' (' + Date.now() + ')');
-    $('#posts').prepend(li);
+    var li = $('<li>').text(post.name + ': ' + post.message + ' (' + (new Date()).toLocaleString() + ')');
+    $('#messages').prepend(li);
   });
 
+  /**
+   * @fn #enter.click
+   * @brief 作成参加ボタンのクリックイベント処理
+   */
   $("#enter").click(function() {
     if(window.localStorage) {
       // localStorageにニックネームを保存
       window.localStorage.setItem(LOCALSTORAGE_NICKNAME, $("#nickname").val());
     }
     $("#enter").attr("disabled", true);
-    return true;
+    $("#form").submit();
   });
 
+  /**
+   * @fn #room_id.change
+   * @brief ルーム選択の変更イベント処理
+   */
   $("#room_id").change(function() {
     if($(this).val() === "") {
-      $("#play").val("作成");
+      $("#enter").val("作成");
     } else {
-      $("#play").val("参加");
+      $("#enter").val("参加");
     }
   });
 
 });
 
 // vim: et sts=2 sw=2:
-

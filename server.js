@@ -96,7 +96,7 @@ function notify_room_update() {
     roomlist.push({room_id: room_id, room_name: g_rooms[room_id].room_name});
   }
   console.log(roomlist);
-  io.sockets.emit('room_update', roomlist);
+  io.sockets.emit('update_room', roomlist);
 }
 
 function notify_user_update(room_id) {
@@ -126,12 +126,22 @@ function make_card_update(game, card_ids_dict) {
   return cards;
 }
 
+/**
+ * @fn io.sockets.connection
+ * @brief コネクション確立イベント処理
+ */
 io.sockets.on('connection', function(socket) {
+  /**
+   * @fn socket.on.enter_index
+   * @brief クライアントがindexページに遷移したことを受信
+   */
   socket.on('enter_index', function() {
     console.log('---- enter_index -------------------------------------------');
-    socket.emit('user_id', socket.id);
+
+    // ユーザIDを生成して通知する
+    socket.emit('create_user_id', socket.id);
     notify_room_update();
-    socket.emit('post', {name: "system", message: "welcome to online とらんぷ!", clear: true});
+    socket.emit('add_message', {name: "system", message: "welcome to online とらんぷ!", clear: true});
   });
 
   socket.on('enter_room', function(user_id) {
