@@ -79,8 +79,8 @@ app.post('/play', function(req, res) {
       for (var num = 1; num <= 13; ++num) {
         var id = suit * 13 + num;
         cardset[id] = {card_id: id, image_ids: [-1, id], suit: suit, num: num,
-                        user: null, picker: null,
-                        x: 10 + 85 * (13 - num), y: 10 + 128 * suit,
+                        owner_id: null, picker_id: null,
+                        rx: 10 + 85 * (13 - num), ry: 10 + 128 * suit,
                         /*w: 60, h: 93,*/
                         z: id,
                         opened: false}
@@ -148,9 +148,10 @@ function make_card_update(game, card_ids_dict) {
   for (var card_id in card_ids_dict) {
     var card = game.cardset[card_id];
     var image = game.imageset[card.image_ids[card.opened ? 1 : 0]];
-    cards.push({card_id: card_id, z: card.z, picker: card.picker,
+    cards.push({card_id: card_id, z: card.z,
+                owner_id: card.owner_id, picker_id: card.picker_id,
                 sx: image.x, sy: image.y, sw: image.w, sh: image.h,
-                dx: card.x, dy: card.y, dw: image.w, dh: image.h});
+                rx: card.rx, ry: card.ry, dw: image.w, dh: image.h});
   }
   return cards;
 }
@@ -230,7 +231,7 @@ io.sockets.on('connection', function(socket) {
     if(game == null) return;
     var card = game.cardset[params.card_id];
 
-    card.picker = user_id;
+    card.picker_id = user_id;
     card.z = ++game.highest_z;
     var cards = {};
     cards[card.card_id] = null;
@@ -250,9 +251,10 @@ io.sockets.on('connection', function(socket) {
     if(game == null) return;
     var card = game.cardset[params.card_id];
 
-    card.x = params.x;
-    card.y = params.y;
-    card.picker = null;
+    card.rx = params.rx;
+    card.ry = params.ry;
+    card.picker_id = null;
+    card.owner_id = params.owner_id;
     var cards = {};
     cards[card.card_id] = null;
     io.sockets.in(room_id).emit('update_card', make_card_update(game, cards));

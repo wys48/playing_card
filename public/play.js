@@ -3,6 +3,7 @@
  * @brief ゲームプレイページのスクリプト(本システムのメイン)
  */
 
+var g_self_id = null;
 var g_cards = {};
 var g_refresh = false;
 var g_image = new Image();
@@ -12,17 +13,52 @@ var g_regions = {};
 var g_users = [];
 
 /**
+ * @fn lookup_region
+ * @brief キャンバス座標から領域を検索する
+ * @param x       [in] X座標(キャンバス座標系)
+ * @param y       [in] Y座標(キャンバス座標系)
+ * @retval null   該当領域無し
+ * @return {region: 領域オブジェクト, rx: 相対X座標, ry: 相対Y座標}
+ */
+function lookup_region(x, y) {
+  for (var key in g_regions) {
+    var region = g_regions[key];
+    var rx = x - region.x;
+    var ry = y - region.y;
+    if(0 <= rx && rx < region.w && 0 <= ry && ry < region.h) {
+      return {region: region, rx: rx, ry: ry};
+    }
+  }
+  return null;
+}
+
+function get_card_region(card) {
+  if (card.owner_id === null) {
+    return g_regions.field;
+  } else if (card.owner_id == g_self_id) {
+    return g_regions.hands;
+  }
+  return null;
+}
+
+function event_to_canvas_coord(event) {
+  var rect = event.target.getBoundingClientRect();
+  return {x: event.clientX - rect.left, y: event.clientY - rect.top};
+}
+
+/**
  * @fn document.onload
  */
 $(function () {
   var socket = io.connect();
+  g_self_id = $("#user_id").val();
 
   /**
    * @fn socket.on.connect
    * @brief サーバとの接続完了
    */
   socket.on('connect', function () {
-    socket.emit('enter_play', $("#user_id").val()); //!< playページへ入ったことを通知
+    socket.emit('enter_play', g_self_id); //!< playページへ入ったことを通知
   });
 
   /**
@@ -64,11 +100,26 @@ $(function () {
     var found = hittest_card(event);
     if (found.card_id == null) return;
     // ドラッグ操作開始
+    var card = g_cards[found.card_id];
     g_dragging = found;
+    g_dragging.dx = card.rx + found.region.x;
+    g_dragging.dy = card.ry + found.region.y;
+    g_dragging.old_rx = card.rx;
+    g_dragging.old_ry = card.ry;
     // サーバへの移動開始通知
-    var user_id = $("#user_id").val();
-    socket.emit('pick_card', {user_id: user_id, card_id: g_dragging.card_id});
+    socket.emit('pick_card', {user_id: g_self_id, card_id: g_dragging.card_id});
   });
+
+  /**
+   * @fn event2canvasXY
+   * @brief マウスイベント座標をキャンバス座標に変換
+   * @param event   [in] イベント情報
+   * @return {x: X座標, y: Y座標}
+   */
+  function event2canvasXY(event) {
+    var rect = event.target.getBoundingClientRect();
+    return {x: event.clientX - rect.left, y: event.clientY - rect.top};
+  }
 
   /**
    * @fn #main.mousemove
@@ -76,15 +127,14 @@ $(function () {
    * @param event   [in] イベント情報
    */
   $("#main").mousemove(function(event){
-    if (g_dragging == null) return;
+    if (g_dragging === null) return;
     // ドラッグ中
-    var rect = event.target.getBoundingClientRect();
-    var mx = event.clientX - rect.left;
-    var my = event.clientY - rect.top;
+    var mouse = event2canvasXY(event);
     var card = g_cards[g_dragging.card_id];
-    var region = g_regions.field;
-    card.dx = Math.min(Math.max(g_dragging.xoffset + mx, region.x), region.x + region.w - card.dw);
-    card.dy = Math.min(Math.max(g_dragging.yoffset + my, region.y), region.y + region.h - card.dh);
+    // キャンバスの外には出られないようにする
+    var canvas = $("#main")[0];
+    g_dragging.dx = Math.min(Math.max(g_dragging.xoffset + mouse.x, 0), canvas.width - card.dw);
+    g_dragging.dy = Math.min(Math.max(g_dragging.yoffset + mouse.y, 0), canvas.height - card.dh);
     g_refresh = true;
   });
 
@@ -96,9 +146,32 @@ $(function () {
   $("#main").mouseup(function(event){
     if (g_dragging == null) return;
     // ドラッグ終了
+    var mouse = event2canvasXY(event);
     var card = g_cards[g_dragging.card_id];
-    var user_id = $("#user_id").val();
-    socket.emit('move_card', {user_id: user_id, card_id: g_dragging.card_id, x: card.dx, y: card.dy});
+    // 移動先の領域判定
+    var destination = lookup_region(mouse.x, mouse.y);
+    var region = (destination !== null) ? destination.region : null;
+    if (region === null || !region.placable) {
+      // 移動キャンセル (行き先が無い)
+      card.rx = g_dragging.old_rx;
+      card.ry = g_dragging.old_ry;
+    } else {
+      if (region.name == "field") {
+        card.owner_id = null;
+      } else if (region.name == "hands") {
+        card.owner_id = g_self_id;
+      } else {
+        alert("panic (not placable region)");
+      }
+      var rx = destination.rx + g_dragging.xoffset;
+      var ry = destination.ry + g_dragging.yoffset;
+      card.rx = Math.min(Math.max(0, rx), region.w - card.dw);
+      card.ry = Math.min(Math.max(0, ry), region.h - card.dh);
+    }
+    socket.emit('move_card',
+      {user_id: g_self_id, card_id: card.card_id,
+       rx: card.rx, ry: card.ry,
+       owner_id: card.owner_id});
     g_dragging = null;
   });
 
@@ -108,10 +181,9 @@ $(function () {
    * @param event   [in] イベント情報
    */
   $("#main").dblclick(function(event){
-    var user_id = $("#user_id").val();
     var found = hittest_card(event);
     if (found.card_id == null) return;
-    socket.emit('click_card', {user_id: user_id, card_id: found.card_id});
+    socket.emit('click_card', {user_id: g_self_id, card_id: found.card_id});
   });
 
   /**
@@ -121,9 +193,19 @@ $(function () {
     if (g_refresh == false) return;
     var canvas = $("#main")[0];
     var context = canvas.getContext('2d');
-    draw_field(context);
-    draw_hands(context);
-    draw_users(context);
+    var sorted_cards = [];
+    for (var card_id in g_cards) {
+      sorted_cards.push(g_cards[card_id]);
+    }
+    sorted_cards.sort(function (a, b) {
+      return a.z - b.z;
+    });
+    draw_field(context, sorted_cards);
+    draw_hands(context, sorted_cards);
+    draw_users(context, sorted_cards);
+    if (g_dragging !== null) {
+      draw_card(context, g_cards[g_dragging.card_id]);
+    }
     g_refresh = false;
   }, 100);
 
@@ -133,11 +215,15 @@ $(function () {
    */
   function init_regions() {
     var canvas = $("#main")[0];
-    g_regions["users"] = {x: null, y: 0, w: 100, h: canvas.height};
+    g_regions["users"] =
+      {name: "users", x: null, y: 0, w: 100, h: canvas.height,
+       placable: false};
     g_regions["hands"] =
-      {x: 0, y: null, w: canvas.width - g_regions.users.w, h: 100};
+      {name: "hands", x: 0, y: null, w: canvas.width - g_regions.users.w, h: 150,
+       placable: true};
     g_regions["field"] =
-      {x: 0, y: 0, w: canvas.width - g_regions.users.w, h: canvas.height - g_regions.hands.h};
+      {name: "field", x: 0, y: 0, w: canvas.width - g_regions.users.w, h: canvas.height - g_regions.hands.h,
+       placable: true};
     g_regions.users.x = g_regions.field.x + g_regions.field.w;
     g_regions.hands.y = g_regions.field.y + g_regions.field.h;
   }
@@ -145,38 +231,52 @@ $(function () {
   init_regions();
 
   /**
+   * @fn draw_card
+   * @brief 1枚のカードの描画
+   * @param context   [in] Canvas context
+   * @param card      [in] card
+   */
+  function draw_card(context, card) {
+    var x, y;
+    if(g_dragging !== null && card.card_id === g_dragging.card_id) {
+      x = g_dragging.dx;
+      y = g_dragging.dy;
+    } else {
+      x = card.rx;
+      y = card.ry;
+    }
+
+    context.lineWidth = 1;
+    context.drawImage(g_image, card.sx, card.sy, card.sw, card.sh,
+                      x, y, card.dw, card.dh);
+    context.beginPath();
+    if (g_dragging !== null && g_dragging.card_id == card.card_id) {
+      context.strokeStyle = "blue";
+    } else if (card.picker_id !== null) {
+      context.strokeStyle = "red";
+    } else {
+      context.strokeStyle = "black";
+    }
+    context.rect(x, y, card.dw, card.dh);
+    context.stroke();
+  }
+
+  /**
    * @fn draw_field
    * @brief 場を描画
    * @param context   [in] Canvas context
    */
-  function draw_field(context) {
+  function draw_field(context, sorted_cards) {
     var region = g_regions.field;
     context.save();
     context.setTransform(1, 0, 0, 1, region.x, region.y);
     context.fillStyle = "green";
     context.fillRect(0, 0, region.w, region.h);
-    context.lineWidth = 1;
-    var sorted_cards = [];
-    for (var card_id in g_cards) {
-      sorted_cards.push(g_cards[card_id]);
-    }
-    sorted_cards.sort(function (a, b) {
-      return a.z - b.z;
-    });
     for (var card_index = 0; card_index < sorted_cards.length; ++card_index) {
       var card = sorted_cards[card_index];
-      context.drawImage(g_image, card.sx, card.sy, card.sw, card.sh,
-                        card.dx, card.dy, card.dw, card.dh);
-      context.beginPath();
-      if (g_dragging != null && g_dragging.card_id == card.card_id) {
-        context.strokeStyle = "blue";
-      } else if (card.picker != null) {
-        context.strokeStyle = "red";
-      } else {
-        context.strokeStyle = "black";
-      }
-      context.rect(card.dx, card.dy, card.dw, card.dh);
-      context.stroke();
+      if (card.owner_id !== null) continue;
+      if (g_dragging !== null && g_dragging.card_id == card.card_id) continue;
+      draw_card(context, card);
     }
     context.restore();
   }
@@ -186,12 +286,18 @@ $(function () {
    * @brief 手札領域を描画
    * @param context   [in] Canvas context
    */
-  function draw_hands(context) {
+  function draw_hands(context, sorted_cards) {
     var region = g_regions.hands;
     context.save();
     context.setTransform(1, 0, 0, 1, region.x, region.y);
     context.fillStyle = "gray";
     context.fillRect(0, 0, region.w, region.h);
+    for (var card_index = 0; card_index < sorted_cards.length; ++card_index) {
+      var card = sorted_cards[card_index];
+      if (card.owner_id != g_self_id) continue;
+      if (g_dragging !== null && g_dragging.card_id == card.card_id) continue;
+      draw_card(context, card);
+    }
     context.restore();
   }
 
@@ -200,7 +306,7 @@ $(function () {
    * @brief 参加者リスト領域を描画
    * @param context   [in] Canvas context
    */
-  function draw_users(context) {
+  function draw_users(context, sorted_cards) {
     var region = g_regions.users;
     context.save();
     context.setTransform(1, 0, 0, 1, region.x, region.y);
@@ -231,27 +337,40 @@ $(function () {
    * @fn hittest_card
    * @brief クリック対象の判定(カード)
    * @param event   [in] イベント情報
+   * @retval null   対象無し
+   * @return {card_id: 対象カードID, region: リージョン,
+   *          xoffset: カードの左上へのXオフセット(≦0),
+   *          yoffset: カードの左上へのYオフセット(≦0),
+   *          z: カードのzオーダー}
    */
   function hittest_card(event){
     var rect = event.target.getBoundingClientRect();
     var mx = event.clientX - rect.left;
     var my = event.clientY - rect.top;
-    var found = {card_id: null, xoffset: 0, yoffset: 0, z: 0};
+    var found = {card_id: null, region: null, xoffset: 0, yoffset: 0, z: 0};
+    var region_hit = lookup_region(mx, my);
+    if (region_hit === null) return found; // どの領域でもない
+    found.region = region_hit;
+    var mrx = region_hit.rx;
+    var mry = region_hit.ry;
+
     for (var card_id in g_cards) {
       var card = g_cards[card_id];
-      if (card.dx <= mx && card.dy <= my && mx < (card.dx + card.dw) && my < (card.dy + card.dh)) {
+      var region = get_card_region(card);
+      if (region !== region_hit.region) continue;
+
+      if (card.rx <= mrx && card.ry <= mry && mrx < (card.rx + card.dw) && mry < (card.ry + card.dh)) {
         if(found.card_id == null || found.z < card.z) {
           found.card_id = card_id;
-          found.xoffset = card.dx - mx;
-          found.yoffset = card.dy - my;
+          found.xoffset = card.rx - mrx;
+          found.yoffset = card.ry - mry;
           found.z = card.z;
         }
       }
     }
     if (found.card_id != null) {
-      var picker = g_cards[found.card_id].picker;
-      var user_id = $("#user_id").val();
-      if (picker != null && picker != user_id) {
+      var picker_id = g_cards[found.card_id].picker_id;
+      if (picker_id !== null && picker_id != g_self_id) {
         found.card_id = null;
       }
     }
@@ -273,8 +392,7 @@ $(function () {
     var i = Math.floor(my / 32);
     var user = g_users[i];
     if (user != null) {
-      var user_id = $("#user_id").val();
-      socket.emit('give_semaphore', {user_id: user_id, receiver_user_id: user.user_id});
+      socket.emit('give_semaphore', {user_id: g_self_id, receiver_user_id: user.user_id});
     }
     return true;
   }
