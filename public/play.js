@@ -14,22 +14,25 @@ var g_users = [];
 
 /**
  * @fn lookup_region
- * @brief キャンバス座標から領域を検索する
+ * @brief キャンバス座標から最も前面の(Zが大きい)領域を検索する
  * @param x       [in] X座標(キャンバス座標系)
  * @param y       [in] Y座標(キャンバス座標系)
  * @retval null   該当領域無し
  * @return {region: 領域オブジェクト, rx: 相対X座標, ry: 相対Y座標}
  */
 function lookup_region(x, y) {
+  var found = null;
   for (var key in g_regions) {
     var region = g_regions[key];
     var rx = x - region.x;
     var ry = y - region.y;
     if(0 <= rx && rx < region.w && 0 <= ry && ry < region.h) {
-      return {region: region, rx: rx, ry: ry};
+      if(found === null || found.region.z < region.z) {
+        found = {region: region, rx: rx, ry: ry};
+      }
     }
   }
-  return null;
+  return found;
 }
 
 function get_card_region(card) {
@@ -37,14 +40,20 @@ function get_card_region(card) {
     return g_regions.field;
   } else if (card.owner_id == g_self_id) {
     return g_regions.hands;
+  } else {
+    for(var i in g_regions) {
+      var region = g_regions[i];
+      if(region.user_id === card.owner_id) return region;
+    }
   }
   return null;
 }
 
-function event_to_canvas_coord(event) {
-  var rect = event.target.getBoundingClientRect();
-  return {x: event.clientX - rect.left, y: event.clientY - rect.top};
-}
+Object.values = function(obj) {
+  var values = [];
+  for(var key in obj) values.push(obj[key]);
+  return values;
+};
 
 /**
  * @fn document.onload
@@ -67,10 +76,13 @@ $(function () {
    * @param cards   [in] カード情報 {card_id:, ...} の配列
    */
   socket.on('update_card', function (cards) {
+    var list = '';
     for (var i in cards) {
       var card = cards[i];
       g_cards[card.card_id] = card;
+      list += card.card_id + ',';
     }
+    console.log(list);
     g_refresh = true;
   });
 
@@ -80,7 +92,7 @@ $(function () {
    * @param users   [in] ユーザ情報 {nickname:, state:, ...} の配列
    */
   socket.on('update_user', function (users) {
-    var obj = $('#users')
+    var obj = $('#users');
     obj.children().remove();
     g_users = users;
     for (var i = 0; i < users.length; ++i) {
@@ -106,6 +118,7 @@ $(function () {
     g_dragging.dy = card.ry + found.region.y;
     g_dragging.old_rx = card.rx;
     g_dragging.old_ry = card.ry;
+    console.log(g_dragging);
     // サーバへの移動開始通知
     socket.emit('pick_card', {user_id: g_self_id, card_id: g_dragging.card_id});
   });
@@ -156,10 +169,12 @@ $(function () {
       card.rx = g_dragging.old_rx;
       card.ry = g_dragging.old_ry;
     } else {
-      if (region.name == "field") {
+      if (region.id == "field") {
         card.owner_id = null;
-      } else if (region.name == "hands") {
+      } else if (region.id == "hands") {
         card.owner_id = g_self_id;
+      } else if (region.user_id !== null) {
+        card.owner_id = region.user_id;
       } else {
         alert("panic (not placable region)");
       }
@@ -193,16 +208,11 @@ $(function () {
     if (g_refresh == false) return;
     var canvas = $("#main")[0];
     var context = canvas.getContext('2d');
-    var sorted_cards = [];
-    for (var card_id in g_cards) {
-      sorted_cards.push(g_cards[card_id]);
-    }
-    sorted_cards.sort(function (a, b) {
-      return a.z - b.z;
+    var sorted_cards = Object.values(g_cards).sort(function (a, b) { return a.z - b.z; });
+    var sorted_regions = Object.values(g_regions).sort(function (a, b) { return a.z - b.z; });
+    sorted_regions.map(function(region){
+      region.draw(context, sorted_cards);
     });
-    draw_field(context, sorted_cards);
-    draw_hands(context, sorted_cards);
-    draw_users(context, sorted_cards);
     if (g_dragging !== null) {
       draw_card(context, g_cards[g_dragging.card_id]);
     }
@@ -215,15 +225,21 @@ $(function () {
    */
   function init_regions() {
     var canvas = $("#main")[0];
+    g_regions["canvas"] =
+      {id: "canvas", z: -1, x: 0, y: 0, w: canvas.width, h: canvas.height,
+       placable: false};
     g_regions["users"] =
-      {name: "users", x: null, y: 0, w: 100, h: canvas.height,
+      {id: "users", z: 1, x: null, y: 0, w: 100, h: g_regions.canvas.h,
        placable: false};
     g_regions["hands"] =
-      {name: "hands", x: 0, y: null, w: canvas.width - g_regions.users.w, h: 150,
+      {id: "hands", z: 2, x: 0, y: null, w: g_regions.canvas.w - g_regions.users.w, h: 150,
        placable: true};
     g_regions["field"] =
-      {name: "field", x: 0, y: 0, w: canvas.width - g_regions.users.w, h: canvas.height - g_regions.hands.h,
+      {id: "field", z: 0, x: 0, y: 0,
+       w: g_regions.canvas.w - g_regions.users.w,
+       h: g_regions.canvas.h - g_regions.hands.h,
        placable: true};
+    g_regions.canvas.draw = function(context, sorted_cards) {};
     g_regions.users.x = g_regions.field.x + g_regions.field.w;
     g_regions.hands.y = g_regions.field.y + g_regions.field.h;
   }
@@ -264,74 +280,71 @@ $(function () {
   /**
    * @fn draw_field
    * @brief 場を描画
-   * @param context   [in] Canvas context
+   * @param context       [in] Canvas context
+   * @param sorted_cards  [in] Z順ソートされたカード配列
    */
-  function draw_field(context, sorted_cards) {
-    var region = g_regions.field;
+  g_regions.field.draw = function (context, sorted_cards) {
     context.save();
-    context.setTransform(1, 0, 0, 1, region.x, region.y);
+    context.setTransform(1, 0, 0, 1, this.x, this.y);
     context.fillStyle = "green";
-    context.fillRect(0, 0, region.w, region.h);
-    for (var card_index = 0; card_index < sorted_cards.length; ++card_index) {
-      var card = sorted_cards[card_index];
-      if (card.owner_id !== null) continue;
-      if (g_dragging !== null && g_dragging.card_id == card.card_id) continue;
+    context.fillRect(0, 0, this.w, this.h);
+    sorted_cards.forEach(function(card){
+      if (card.owner_id !== null) return;
+      if (g_dragging !== null && g_dragging.card_id == card.card_id) return;
       draw_card(context, card);
-    }
+    });
     context.restore();
-  }
+  };
 
   /**
    * @fn draw_hands
-   * @brief 手札領域を描画
-   * @param context   [in] Canvas context
+   * @brief 自分の手札領域を描画
+   * @param context       [in] Canvas context
+   * @param sorted_cards  [in] Z順ソートされたカード配列
    */
-  function draw_hands(context, sorted_cards) {
-    var region = g_regions.hands;
+  g_regions.hands.draw = function (context, sorted_cards) {
     context.save();
-    context.setTransform(1, 0, 0, 1, region.x, region.y);
+    context.setTransform(1, 0, 0, 1, this.x, this.y);
     context.fillStyle = "gray";
-    context.fillRect(0, 0, region.w, region.h);
-    for (var card_index = 0; card_index < sorted_cards.length; ++card_index) {
-      var card = sorted_cards[card_index];
-      if (card.owner_id != g_self_id) continue;
-      if (g_dragging !== null && g_dragging.card_id == card.card_id) continue;
+    context.fillRect(0, 0, this.w, this.h);
+    sorted_cards.forEach(function(card){
+      if (card.owner_id != g_self_id) return;
+      if (g_dragging !== null && g_dragging.card_id == card.card_id) return;
       draw_card(context, card);
-    }
+    });
     context.restore();
-  }
+  };
 
   /**
    * @fn draw_users
    * @brief 参加者リスト領域を描画
-   * @param context   [in] Canvas context
+   * @param context       [in] Canvas context
+   * @param sorted_cards  [in] Z順ソートされたカード配列
    */
-  function draw_users(context, sorted_cards) {
-    var region = g_regions.users;
+  g_regions.users.draw = function (context, sorted_cards) {
     context.save();
-    context.setTransform(1, 0, 0, 1, region.x, region.y);
+    context.setTransform(1, 0, 0, 1, this.x, this.y);
     context.fillStyle = "pink";
-    context.fillRect(0, 0, region.w, region.h);
+    context.fillRect(0, 0, this.w, this.h);
     context.textAlign = "left";
     context.textBaseline = "bottom";
     context.strokeStyle = "black";
     context.lineWidth = 1;
     context.font = "16pt 'Times New Roman'";
-    for (var i in g_users) {
-      var user = g_users[i];
+    g_users.forEach(function(user){
       if (user.sem_owner) {
         context.fillStyle = "red";
       } else {
         context.fillStyle = "pink";
       }
-      context.fillRect(0, 0, region.w, 32);
+      context.fillRect(0, 0, this.w, 32);
       context.fillStyle = "black";
       context.fillText(user.nickname, 0, 28);
       context.transform(1, 0, 0, 1, 0, 32);
-    }
+    });
     context.stroke();
     context.restore();
-  }
+  };
 
   /**
    * @fn hittest_card
@@ -344,13 +357,11 @@ $(function () {
    *          z: カードのzオーダー}
    */
   function hittest_card(event){
-    var rect = event.target.getBoundingClientRect();
-    var mx = event.clientX - rect.left;
-    var my = event.clientY - rect.top;
+    var mouse = event2canvasXY(event);
     var found = {card_id: null, region: null, xoffset: 0, yoffset: 0, z: 0};
-    var region_hit = lookup_region(mx, my);
+    var region_hit = lookup_region(mouse.x, mouse.y);
     if (region_hit === null) return found; // どの領域でもない
-    found.region = region_hit;
+    found.region = region_hit.region;
     var mrx = region_hit.rx;
     var mry = region_hit.ry;
 
@@ -383,18 +394,80 @@ $(function () {
    * @param event   [in] イベント情報
    */
   function hittest_user(event) {
-    var rect = event.target.getBoundingClientRect();
-    var region = g_regions.users;
-    var mx = event.clientX - rect.left - region.x;
-    var my = event.clientY - rect.top - region.y;
+    var mouse = event2canvasXY(event);
+    var region_hit = lookup_region(mouse.x, mouse.y);
+    if (region_hit.region.id != "users") return false;
+    var user_height = 32;
 
-    if (mx < 0 || mx >= region.w || my < 0 || my >= region.h) return false;
-    var i = Math.floor(my / 32);
+    var i = Math.floor(region_hit.ry / user_height);
     var user = g_users[i];
     if (user != null) {
       socket.emit('give_semaphore', {user_id: g_self_id, receiver_user_id: user.user_id});
+      toggle_hands_popup(user, i * user_height + user_height / 2 + mouse.y);
     }
     return true;
+  }
+
+  /**
+   * @fn draw_other_hands
+   * @brief 他人の手札ポップアップを描画
+   * @param context       [in] Canvas context
+   * @param sorted_cards  [in] Z順ソートされたカード配列
+   */
+  function draw_other_hands(context, sorted_cards) {
+    context.save();
+    context.setTransform(1, 0, 0, 1, this.x, this.y);
+    context.fillStyle = "yellow";
+    context.fillRect(0, 0, this.w, this.h);
+    context.strokeStyle = "black";
+    context.lineWidth = 1;
+    context.rect(0, 0, this.w, this.h);
+    context.stroke();
+    context.textAlign = "left";
+    context.textBaseline = "bottom";
+    context.font = "12pt 'Times New Roman'";
+    var user;
+    for(var i in g_users) {
+      user = g_users[i];
+      if (user.user_id === this.user_id) break;
+      user = null;
+    }
+    context.fillStyle = "black";
+    context.fillText(user.nickname + "(" + user.user_id + ")", 3, 20);
+    sorted_cards.forEach(function(card){
+      if (card.owner_id != user.user_id) return;
+      if (g_dragging !== null && g_dragging.card_id == card.card_id) return;
+      draw_card(context, card);
+    });
+    context.restore();
+  }
+
+  /**
+   * @fn toggle_hands_popup
+   * @brief 他人の手札ポップアップを開く/閉じる
+   * @param user    [in] 対象ユーザー
+   * @param y_hint  [in] 表示位置のヒント
+   */
+  function toggle_hands_popup(user, y_hint) {
+    if(g_regions.hasOwnProperty(user.user_id)) {
+      delete g_regions[user.user_id];
+      g_refresh = true;
+      return;
+    }
+    y_hint = Math.min(g_regions.canvas.h - g_regions.hands.h / 2, Math.max(g_regions.hands.h / 2, y_hint));
+    var new_z = Object.keys(g_regions).length;
+    g_regions[user.user_id] = {
+      id: user.user_id,
+      z: new_z,
+      x: 10,
+      y: y_hint - g_regions.hands.h / 2,
+      w: g_regions.hands.w,
+      h: g_regions.hands.h,
+      placable: true,
+      user_id: user.user_id,
+      draw: draw_other_hands,
+    };
+    g_refresh = true;
   }
 
 });
