@@ -8,6 +8,7 @@ var g_cards = {};
 var g_refresh = false;
 var g_image = new Image();
 g_image.src = "images/cards_trump.png";
+var g_imageset = null;
 var g_dragging = null;
 var g_regions = {};
 var g_users = [];
@@ -68,6 +69,15 @@ $(function () {
    */
   socket.on('connect', function () {
     socket.emit('enter_play', g_self_id); //!< playページへ入ったことを通知
+  });
+
+  /**
+   * @fn socket.on.register_imageset
+   * @brief imagesetの共有(クライアントへの登録)
+   * @param imageset  [in] イメージセット {id: {x:, y:, w:, h:}, ...}
+   */
+  socket.on('register_imageset', function (imageset) {
+    g_imageset = imageset;
   });
 
   /**
@@ -263,8 +273,9 @@ $(function () {
     }
 
     context.lineWidth = 1;
-    context.drawImage(g_image, card.sx, card.sy, card.sw, card.sh,
-                      x, y, card.dw, card.dh);
+    var image = g_imageset[card.image_id];
+    context.drawImage(g_image, image.x, image.y, image.w, image.h,
+                      x, y, image.w, image.h);
     context.beginPath();
     if (g_dragging !== null && g_dragging.card_id == card.card_id) {
       context.strokeStyle = "blue";
