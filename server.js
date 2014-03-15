@@ -19,6 +19,26 @@ app.configure(function () {
   app.use(express.bodyParser()); // req.bodyを生成させるために必要
 });
 
+function array_shuffle(array) {
+  var i = array.length;
+  while(i){
+    var j = Math.floor(Math.random()*i);
+    var t = array[--i];
+    array[i] = array[j];
+    array[j] = t;
+  }
+  return array;
+}
+
+function sequence(first, last, step) {
+  var r = [];
+  if(step === undefined) step = 1;
+  for(var i = first; i <= last; i += step) {
+    r.push(i)
+  }
+  return r;
+}
+
 /*
  * HTML ページ出力
  */
@@ -40,7 +60,8 @@ app.post('/room', function(req, res) {
   var user_id = req.body.user_id;
   var room_id = req.body.room_id;
   var new_room = (room_id == "");
-  if(new_room) room_id = user_id;
+  // if(new_room) room_id = user_id;
+  if(new_room) room_id = "r@" + user_id;
   g_users[user_id] = {user_id: user_id, nickname: nickname,
                       room_id: room_id,
                       role: (new_room ? "owner" : "user"),
@@ -75,15 +96,17 @@ app.post('/play', function(req, res) {
     // FIXME: 神経衰弱限定のロジック
     cardset = {}
     imageset = {}
+    // var ids = Array.apply(null, {length: 4 * 13}).map(Number.call, Number);
+    // /* ↑さすがに分かりにくいので却下 */
+    var ids = array_shuffle(sequence(1, 4 * 13));
+    console.log('shuffled: ', ids);
     for (var suit = 0; suit < 4; ++suit) {
       for (var num = 1; num <= 13; ++num) {
         var id = suit * 13 + num;
-        cardset[id] = {card_id: id, image_ids: [-1, id], suit: suit, num: num,
+        cardset[id] = {card_id: id, image_ids: [-1, ids[id - 1]],
                         owner_id: null, picker_id: null,
                         rx: 10 + 85 * (13 - num), ry: 10 + 128 * suit,
-                        /*w: 60, h: 93,*/
-                        z: id,
-                        opened: false}
+                        dw: 79, dh: 123, z: id, opened: false}
         imageset[id] = {x: 79 * (num - 1), y: 123 * suit, w: 79, h: 123}
       }
     }
@@ -114,6 +137,7 @@ function notify_room_update() {
   for (var room_id in g_rooms) {
     roomlist.push({room_id: room_id, room_name: g_rooms[room_id].room_name});
   }
+  console.log(roomlist);
   io.sockets.emit('update_room', roomlist);
 }
 
@@ -126,10 +150,12 @@ function notify_user_update(room_id) {
   var room = g_rooms[room_id];
   var user_states = [];
   var sem = (room.game != null) ? room.game.semaphore : null;
+  console.log('notify_user_update', g_users);
+  console.log('notify_user_update_2', room.user_ids);
   for (var i in room.user_ids) {
     var u = g_users[room.user_ids[i]];
     var is_owner = false;
-    if (sem && sem.owner.indexOf(u.user_id) >= 0) {
+    if(sem && sem.owner.indexOf(u.user_id) >= 0) {
       is_owner = true;
     }
     user_states.push({nickname: u.nickname, state: u.state, sem_owner: is_owner, user_id: u.user_id});
@@ -142,18 +168,38 @@ function notify_user_update(room_id) {
  * @brief update_card用の送信データを作成
  * @param game            [in] 対象ゲーム
  * @param card_ids_dict   [in] カードIDをキーにしたディクショナリ
+ * @param target_user_id  [in] 送信先ユーザID
  */
-function make_card_update(game, card_ids_dict) {
+function make_card_update(game, card_ids_dict, target_user_id) {
   var cards = [];
   for (var card_id in card_ids_dict) {
     var card = game.cardset[card_id];
-    var image = game.imageset[card.image_ids[card.opened ? 1 : 0]];
+    var side = card.opened ? 1 : 0;
+    if(card.owner_id !== null && card.owner_id != target_user_id) {
+      side = 1 - side;
+    }
     cards.push({card_id: card_id, z: card.z,
                 owner_id: card.owner_id, picker_id: card.picker_id,
-                sx: image.x, sy: image.y, sw: image.w, sh: image.h,
-                rx: card.rx, ry: card.ry, dw: image.w, dh: image.h});
+                rx: card.rx, ry: card.ry, dw: card.dw, dh: card.dh,
+                image_id: card.image_ids[side]});
   }
   return cards;
+}
+
+/**
+ * @fn broadcast_card_update
+ * @brief 全ユーザにカードの更新情報を送信
+ * @param room            [in] 対象ルーム
+ * @param card_ids_dict   [in] カードIDをキーにしたディクショナリ
+ */
+function broadcast_card_update(room, card_ids_dict) {
+  var user_ids = room.user_ids;
+  for(var i in user_ids) {
+    var user_id = user_ids[i];
+    io.sockets.in(user_id).emit('update_card',
+      make_card_update(room.game, card_ids_dict, user_id));
+    console.log('broadcast_card_update to ' + user_id, card_ids_dict);
+  }
 }
 
 /**
@@ -193,9 +239,11 @@ io.sockets.on('connection', function(socket) {
 
     var room_id = g_users[user_id].room_id;
     socket.join(room_id);
+    socket.join(user_id);
     var game = g_rooms[room_id].game;
     if(game == null) return;
-    socket.emit('update_card', make_card_update(game, game.cardset));
+    socket.emit('register_imageset', game.imageset);
+    socket.emit('update_card', make_card_update(game, game.cardset, user_id));
     notify_user_update(room_id);
   });
 
@@ -215,7 +263,7 @@ io.sockets.on('connection', function(socket) {
     card.opened = !card.opened;
     var cards = {};
     cards[card.card_id] = null;
-    io.sockets.in(room_id).emit('update_card', make_card_update(game, cards));
+    broadcast_card_update(g_rooms[room_id], cards);
   });
 
   /**
@@ -235,7 +283,7 @@ io.sockets.on('connection', function(socket) {
     card.z = ++game.highest_z;
     var cards = {};
     cards[card.card_id] = null;
-    io.sockets.in(room_id).emit('update_card', make_card_update(game, cards));
+    broadcast_card_update(g_rooms[room_id], cards);
   });
 
   /**
@@ -257,7 +305,7 @@ io.sockets.on('connection', function(socket) {
     card.owner_id = params.owner_id;
     var cards = {};
     cards[card.card_id] = null;
-    io.sockets.in(room_id).emit('update_card', make_card_update(game, cards));
+    broadcast_card_update(g_rooms[room_id], cards);
   });
 
   /**
@@ -274,7 +322,7 @@ io.sockets.on('connection', function(socket) {
 
     var sem = game.semaphore;
     var index = sem.owner.indexOf(user_id);
-    if (index < 0) return; // 現在のセマフォ所有者でないため無視
+    if(index < 0) return; // 現在のセマフォ所有者でないため無視
     sem.owner.splice(index, 1);
     sem.owner.push(params.receiver_user_id);
     notify_user_update(room_id);
