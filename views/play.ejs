@@ -5,10 +5,11 @@
 <script src="http://ajax.googleapis.com/ajax/libs/jquery/1.8/jquery.min.js"></script>
 <script type="text/javascript" src="/socket.io/socket.io.js"></script>
 <script src="play.js"></script>
+<link rel="stylesheet" type="text/css" href="common.css">
 <meta charset=utf-8 />
 <title><%= room.room_name %> - トランプ</title>
 </head>
-<body>
+<body class="unselectable">
   <h3><%= room.room_name %> - トランプ (user_id: <%= user.user_id %>)</h3>
   <h4>ゲームですよ、<%= user.nickname %>さん <a href="/">Topへ戻る</a></h4>
   <h4>場</h4>
