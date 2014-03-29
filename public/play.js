@@ -12,6 +12,7 @@ var g_imageset = null;
 var g_dragging = null;
 var g_regions = {};
 var g_users = [];
+var g_hover = {user_id: null, timer: null};
 
 /**
  * @fn lookup_region
@@ -118,7 +119,15 @@ $(function () {
    * @param event   [in] イベント情報
    */
   $("#main").mousedown(function(event){
-    if (hittest_user(event)) return;
+    var user_info = hittest_user(event);
+    if (user_info != null) {
+      console.log(user_info);
+      socket.emit('give_semaphore', {user_id: g_self_id, receiver_user_id: user_info.user.user_id});
+      if (user_info.user.user_id != g_self_id) {
+        toggle_hands_popup(user_info.user, user_info.y);
+      }
+      return;
+    }
     var found = hittest_card(event);
     if (found.card_id == null) return;
     // ドラッグ操作開始
@@ -152,6 +161,24 @@ $(function () {
   $("#main").mousemove(function(event){
     if (g_dragging === null) return;
     // ドラッグ中
+    var user_info = hittest_user(event);
+    if (user_info != null) {
+      if (g_hover.user_id !== user_info.user.user_id) {
+        if (g_hover.timer != null) clearInterval(g_hover.timer);
+        g_hover.timer = setInterval(function (){
+          clearInterval(g_hover.timer); // oneshot
+          g_hover.timer = null;
+          if (user_info.user.user_id != g_self_id) {
+            toggle_hands_popup(user_info.user, user_info.y);
+          }
+        }, 700);
+        g_hover.user_id = user_info.user.user_id;
+      }
+    } else {
+      if (g_hover.timer != null) clearInterval(g_hover.timer);
+      g_hover.user_id = null;
+      g_hover.timer = null;
+    }
     var mouse = event2canvasXY(event);
     var card = g_cards[g_dragging.card_id];
     // キャンバスの外には出られないようにする
@@ -272,7 +299,7 @@ $(function () {
       y = card.ry;
     }
 
-    context.lineWidth = 1;
+    context.lineWidth = 1.5;
     var image = g_imageset[card.image_id];
     context.drawImage(g_image, image.x, image.y, image.w, image.h,
                       x, y, image.w, image.h);
@@ -340,17 +367,21 @@ $(function () {
     context.textAlign = "left";
     context.textBaseline = "bottom";
     context.strokeStyle = "black";
-    context.lineWidth = 1;
+    context.lineWidth = 1.5;
     context.font = "16pt 'Times New Roman'";
+    context.beginPath();
+    var _this = this;
     g_users.forEach(function(user){
       if (user.sem_owner) {
         context.fillStyle = "red";
       } else {
         context.fillStyle = "pink";
       }
-      context.fillRect(0, 0, this.w, 32);
+      context.fillRect(0, 0, _this.w, 32);
       context.fillStyle = "black";
       context.fillText(user.nickname, 0, 28);
+      context.rect(0, 0, _this.w, 32);
+
       context.transform(1, 0, 0, 1, 0, 32);
     });
     context.stroke();
@@ -403,20 +434,17 @@ $(function () {
    * @fn hittest_user
    * @brief クリック対象の判定(ユーザ)
    * @param event   [in] イベント情報
+   * @return ユーザの番号
    */
   function hittest_user(event) {
     var mouse = event2canvasXY(event);
     var region_hit = lookup_region(mouse.x, mouse.y);
-    if (region_hit.region.id != "users") return false;
+    if (region_hit.region.id != "users") return null;
     var user_height = 32;
-
     var i = Math.floor(region_hit.ry / user_height);
     var user = g_users[i];
-    if (user != null) {
-      socket.emit('give_semaphore', {user_id: g_self_id, receiver_user_id: user.user_id});
-      toggle_hands_popup(user, i * user_height + user_height / 2 + mouse.y);
-    }
-    return true;
+    if (user == null) return null;
+    return {y: i * user_height + user_height / 2 + mouse.y, user: user};
   }
 
   /**
@@ -431,7 +459,8 @@ $(function () {
     context.fillStyle = "yellow";
     context.fillRect(0, 0, this.w, this.h);
     context.strokeStyle = "black";
-    context.lineWidth = 1;
+    context.lineWidth = 1.5;
+    context.beginPath();
     context.rect(0, 0, this.w, this.h);
     context.stroke();
     context.textAlign = "left";
@@ -481,6 +510,12 @@ $(function () {
     g_refresh = true;
   }
 
+  // オブジェクト動的生成を試したけど上手くいかない(´・ω・｀)
+  // var i;
+  // for(i = 0; i < 100; i += 1) {
+  //   $('body').add('canvas').width("10px").height("10px").css('background-color',
+  //   'rgb(' + i + ',' + i + ',' + i + ')');
+  // }
 });
 
 // vim: et sts=2 sw=2:
