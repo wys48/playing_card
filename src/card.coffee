@@ -1,22 +1,16 @@
 PC = {} unless PC?
-PC.Common = {} unless PC.Common?
+PC._SIDE_ = {} unless PC._SIDE_?
 
-class PC.Common.Card extends PC.Common.Movable
+class PC._SIDE_.Card extends PC._SIDE_.Movable
   ###*
-  @class PC.Common.Card
-  @extends PC.Common.Movable
-  カードクラス(Client/Server共通部)
+  @class PC._SIDE_.Card
+  @extends PC._SIDE_.Movable
+  カードクラス(_SIDE_ 側)
 
   @constructor
   コンストラクタ
   ###
   constructor: ->
-    if (server)
-    {
-    }
-    else
-    {
-    }
 
   ###*
   @property {Boolean}
@@ -37,7 +31,7 @@ class PC.Common.Card extends PC.Common.Movable
   zorder: ->
 
   ###*
-  @property {PC.Common.Placeable}
+  @property {PC._SIDE_.Placeable}
   所属
   ###
   place: ->

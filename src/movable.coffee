@@ -1,11 +1,11 @@
 PC = {} unless PC?
-PC.Common = {} unless PC.Common?
+PC._SIDE_ = {} unless PC._SIDE_?
 
-class PC.Common.Movable extends PC.Common.Placeable
+class PC._SIDE_.Movable extends PC._SIDE_.Placeable
   ###*
-  @class PC.Common.Movable
-  @extends PC.Common.Placeable
-  移動可能オブジェクトクラスの基底(Client/Server共通部)
+  @class PC._SIDE_.Movable
+  @extends PC._SIDE_.Placeable
+  移動可能オブジェクトクラスの基底(_SIDE_ 側)
 
   @constructor
   コンストラクタ
@@ -15,7 +15,7 @@ class PC.Common.Movable extends PC.Common.Placeable
   ###*
   @method
   オブジェクトを持ち上げる
-  @param {} picker
+  @param {PC._SIDE_.Player} picker
   @param {Function} callback
   ###
   pick: (picker, callback) ->
@@ -23,7 +23,7 @@ class PC.Common.Movable extends PC.Common.Placeable
   ###*
   @method
   オブジェクトを置く
-  @param {PC.Common.Placeable} placeable
+  @param {PC._SIDE_.Placeable} placeable
   @param {PC.Common.Coord} coord
   @param {Function} callback
   ###

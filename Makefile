@@ -1,8 +1,9 @@
-SRCDIR = coffee/common
+SRCDIR = src
 OUTDIR = public/test
 CLIENTDIR = client
 SERVERDIR = server
 CLASSES := $(shell echo $$(cat $(SRCDIR)/hierarchy))
+PREPROCESS = cpp -P -traditional
 
 #.PHONY: doc
 #doc:
@@ -22,14 +23,17 @@ $(SRCDIR)/.app.coffee: $(foreach c,$(CLASSES),$(SRCDIR)/$(c).coffee)
 
 # JavaScript compile
 $(CLIENTDIR)/app.js: $(SRCDIR)/.app.coffee
-	cpp -E -Xpreprocessor -DCLIENT -D_SIDE_=Client $< | coffee --compile --stdio --output $@
+	mkdir -p $(dir $@)
+	$(PREPROCESS) -DCLIENT -D_SIDE_=Client $< | coffee --compile --stdio > $@ || (rm -f $@; false)
 
 $(SERVERDIR)/app.js: $(SRCDIR)/.app.coffee
-	cpp -E -Xpreprocessor -DSERVER -D_SIDE_=Server $< | coffee --compile --stdio --output $@
+	mkdir -p $(dir $@)
+	$(PREPROCESS) -DSERVER -D_SIDE_=Server $< | coffee --compile --stdio > $@ || (rm -f $@; false)
 
 # Document generation
-doc:
-	jsduck -o public/doc --builtin-classes $(CLIENTDIR)/app.js $(SERVERDIR)/app.js
+.PHONY: doc
+doc: $(CLIENTDIR)/app.js $(SERVERDIR)/app.js
+	jsduck -o public/doc --builtin-classes $^
 
 #doc2:
 #	cat $(SRCDIR)/*.coffee > public/test/app.js

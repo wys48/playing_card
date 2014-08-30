@@ -1,10 +1,10 @@
 PC = {} unless PC?
-PC.Common = {} unless PC.Common?
+PC._SIDE_ = {} unless PC._SIDE_?
 
-class PC.Common.Placeable
+class PC._SIDE_.Placeable
   ###*
-  @class PC.Common.Placeable
-  移動可能オブジェクトを置くことのできるクラスの基底(Client/Server共通部)
+  @class PC._SIDE_.Placeable
+  移動可能オブジェクトを置くことのできるクラスの基底(_SIDE_ 側)
 
   @constructor
   コンストラクタ
@@ -14,7 +14,7 @@ class PC.Common.Placeable
   ###*
   @method
   移動可能オブジェクトを中に置くことができるかを調べる
-  @param {PC.Common.Movable} movable
+  @param {PC._SIDE_.Movable} movable
   @param {Function} callback
   ###
   canPutIn: (movable, callback) ->
@@ -22,7 +22,7 @@ class PC.Common.Placeable
   ###*
   @method
   移動可能オブジェクトが中に置かれた
-  @param {PC.Common.Movable} movable
+  @param {PC._SIDE_.Movable} movable
   @param {Function} callback
   ###
   onPutIn: (movable, callback) ->
@@ -30,7 +30,7 @@ class PC.Common.Placeable
   ###*
   @method
   移動可能オブジェクトを外に出すことができるかを調べる
-  @param {PC.Common.Movable} movable
+  @param {PC._SIDE_.Movable} movable
   @param {Function} callback
   ###
   canPutOut: (movable, callback) ->
@@ -38,7 +38,7 @@ class PC.Common.Placeable
   ###*
   @method
   移動可能オブジェクトが外に出された
-  @param {PC.Common.Movable} movable
+  @param {PC._SIDE_.Movable} movable
   @param {Function} callback
   ###
   onPutOut: (movable, callback) ->

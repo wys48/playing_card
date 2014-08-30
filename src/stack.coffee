@@ -1,11 +1,11 @@
 PC = {} unless PC?
-PC.Common = {} unless PC.Common?
+PC._SIDE_ = {} unless PC._SIDE_?
 
-class PC.Common.Stack extends PC.Common.Movable
+class PC._SIDE_.Stack extends PC._SIDE_.Movable
   ###*
-  @class PC.Common.Stack
-  @extends PC.Common.Movable
-  山札クラス(Client/Server共通部)
+  @class PC._SIDE_.Stack
+  @extends PC._SIDE_.Movable
+  山札クラス(_SIDE_ 側)
 
   @constructor
   コンストラクタ
@@ -25,7 +25,7 @@ class PC.Common.Stack extends PC.Common.Movable
   zorder: ->
 
   ###*
-  @property {PC.Common.Placeable}
+  @property {PC._SIDE_.Placeable}
   所属
   ###
   place: ->
