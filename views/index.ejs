@@ -4,12 +4,17 @@
 <head>
 <script src="http://ajax.googleapis.com/ajax/libs/jquery/1.8/jquery.min.js"></script>
 <script type="text/javascript" src="/socket.io/socket.io.js"></script>
+<script src="enchant.js"></script>
+<script src="plugins/widget.enchant.js"></script>
+<script src="PlayingCardGame.js"></script>
+<script src="CardSprite.js"></script>
 <script src="index.js"></script>
 <meta charset=utf-8 />
 <title>トランプ</title>
 </head>
-<body>
+<body style="background-color: #e0e0e0">
   <h3>トランプ</h3>
+  <h2><span id="console"></span></h2>
   <form method="POST" id="form" action="/room">
     <input type="hidden" name="action" value="enter">
     <label for="nickname">あなたのお名前：</label><input type="text" name="nickname" id="nickname" value="お名前"><br/>
