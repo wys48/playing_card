@@ -15,7 +15,10 @@ PREPROCESS = cpp -P -traditional
 #	cp $(SRCDIR)/*.html public/test/
 #	# jsduck -o public/doc --builtin-classes common/*.js server/*.js client/*.js coffee/common/*.js
 
-default: doc
+default: doc tmlib
+
+tmlib:
+	cd tmlib.js && grunt
 
 # CoffeeScript concatenate
 $(SRCDIR)/.app.coffee: $(foreach c,$(CLASSES),$(SRCDIR)/$(c).coffee)
@@ -24,11 +27,11 @@ $(SRCDIR)/.app.coffee: $(foreach c,$(CLASSES),$(SRCDIR)/$(c).coffee)
 # JavaScript compile
 $(CLIENTDIR)/app.js: $(SRCDIR)/.app.coffee
 	mkdir -p $(dir $@)
-	$(PREPROCESS) -DCLIENT -D_SIDE_=Client $< | coffee --compile --stdio > $@ || (rm -f $@; false)
+	$(PREPROCESS) -D_CLIENT_ -D_SIDE_=Client $< | coffee --compile --stdio > $@ || (rm -f $@; false)
 
 $(SERVERDIR)/app.js: $(SRCDIR)/.app.coffee
 	mkdir -p $(dir $@)
-	$(PREPROCESS) -DSERVER -D_SIDE_=Server $< | coffee --compile --stdio > $@ || (rm -f $@; false)
+	$(PREPROCESS) -D_SERVER_ -D_SIDE_=Server $< | coffee --compile --stdio > $@ || (rm -f $@; false)
 
 # Document generation
 .PHONY: doc

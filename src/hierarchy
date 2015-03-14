@@ -1,6 +1,11 @@
-placeable
-  area
-  movable
-    card
-    stack
+syncable
+  placeable
+    area
+    movable
+      card
+      stack
 coord
+sandbox
+playscene
+client
+server

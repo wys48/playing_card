@@ -12,4 +12,12 @@ class PC._SIDE_.Area extends PC._SIDE_.Placeable
   ###
   constructor: ->
 
+  ###*
+  @method
+  移動可能オブジェクトを中に置くことができるかを調べる
+  @param {PC._SIDE_.Movable} movable
+  @param {Function} callback
+  ###
+  canPutIn: (movable, callback) -> callback(true) # FIXME:あらゆるものを置くことが出来る
+
   # vim:et sts=2 sw=2

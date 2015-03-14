@@ -11,22 +11,73 @@ class PC._SIDE_.Movable extends PC._SIDE_.Placeable
   コンストラクタ
   ###
   constructor: ->
+    super
+#ifdef _SERVER_
+    #  @hoge = test
+    #  @syncTarget.push("hoge")
+#endif
+
+  PC._SIDE_.Syncable.extendedBy(this)
 
   ###*
   @method
   オブジェクトを持ち上げる
-  @param {PC._SIDE_.Player} picker
-  @param {Function} callback
+#ifdef _SERVER_
+  @param {PC._SIDE_.Player} context.requester
+#endif
+  @param {Function} context.callback (boolean accepted)
   ###
-  pick: (picker, callback) ->
+  pick: (context) ->
+#ifdef _CLIENT_
+    @requestServer("pick", context)
+#endif
+#ifdef _SERVER_
+    callback = context.callback
+    requester = context.requester
+    return callback(false) unless @canPick(requester)
+    @onPickedUp(requester)
+    callback(true)
+#endif
 
   ###*
   @method
   オブジェクトを置く
+#ifdef _SERVER_
+  @param {PC._SIDE_.Player} context.requester
+#endif
+  @param {Function} context.callback (boolean accepted)
   @param {PC._SIDE_.Placeable} placeable
   @param {PC.Common.Coord} coord
-  @param {Function} callback
   ###
-  put: (placeable, coord, callback) ->
+  put: (context, placeable, coord) ->
+#ifdef _CLIENT_
+    @requestServer("put", context, placeable, coord)
+#endif
+#ifdef _SERVER_
+    callback = context.callback
+    requester = context.requester
+    # if @container != placeable
+    #   return callback(false) unless placeable.canPutIn(this)
+    #  placeable.onPutIn(requester, )
+    callback(true)
+#endif
+
+#ifdef _SERVER_
+  ###*
+  @method
+  オブジェクトが持ち上げ可能かどうかを判定する
+  @return {Boolean}
+  ###
+  canPick: (picker) ->
+    false
+
+  ###*
+  @method
+  オブジェクトが持ち上げられた時の動作を行う
+  @param {PC._SIDE_.Player} picker
+  ###
+  onPickedUp: (picker) ->
+    null
+#endif
 
   # vim:et sts=2 sw=2
