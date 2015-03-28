@@ -12,6 +12,9 @@ class PC._SIDE_.Placeable extends PC._SIDE_.Syncable
   constructor: ->
     super
     @_element = null
+#ifdef _CLIENT_
+    # @
+#endif
 
   PC._SIDE_.Syncable.extendedBy(this)
 
@@ -70,6 +73,20 @@ class PC._SIDE_.Placeable extends PC._SIDE_.Syncable
       parent.addChild(@_element)
       callback(true)
     )
+#endif
+
+#ifdef _CLIENT_
+  ###*
+  @property {PC.Common.Coord}
+  領域中心点のキャンバス座標
+  ###
+  coord: null
+
+  ###*
+  @property {PC.Common.Size}
+  領域のキャンバス座標系サイズ
+  ###
+  size: null
 #endif
 
   # vim:et sts=2 sw=2

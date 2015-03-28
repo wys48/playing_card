@@ -28,6 +28,9 @@ class PC._SIDE_.Scenes.PlayScene #extends tm.app.Scene
       )
     )
     @scene.checkHierarchy = true
+    @area = []
+    @area[0] = new PC._SIDE_.Area(100, 0, 1280, 360)
+    @area[1] = new PC._SIDE_.Area(100, 360, 1280, 360, false)
 
   getScene: ->
     @scene

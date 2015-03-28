@@ -80,4 +80,52 @@ class PC._SIDE_.Movable extends PC._SIDE_.Placeable
     null
 #endif
 
+  ###*
+  @property {PC._SIDE_.Placeable}
+  所属
+  ###
+  place: null
+
+  ###*
+  @property {Number} relativeX
+  所属領域内の正規化相対X座標
+  ###
+#ifdef _CLIENT_
+  @property("relativeX",
+    get: ->
+      return null unless @place
+      (@coord.x - @place.coord.x) / @place.size.w
+    set: (value) ->
+      return unless @place
+      @coord.x = (value * @place.size.w) + @place.coord.x
+  )
+#endif
+#ifdef _SERVER_
+  relativeX: null
+#endif
+
+  ###*
+  @property {Number} relativeY
+  所属領域内の正規化相対Y座標
+  ###
+#ifdef _CLIENT_
+  @property("relativeY",
+    get: ->
+      return null unless @place
+      (@coord.y - @place.coord.y) / @place.size.h
+    set: (value) ->
+      return unless @place
+      @coord.y = (value * @place.size.h) + @place.coord.y
+  )
+#endif
+#ifdef _SERVER_
+  relativeY: null
+#endif
+
+  ###*
+  @property {Number}
+  カードのZオーダー(大きいほど前面)
+  ###
+  zorder: null
+
   # vim:et sts=2 sw=2

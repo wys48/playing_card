@@ -92,6 +92,7 @@ class PC._SIDE_.Syncable
         instance.onSync(data.properties)
       else
         klass = @subclasses[data.className]
+        console.log("sycable_is_creating_a_new_class": data.properties)
         instance = new klass(data.properties)
         instance.uuid = data.uuid
         @map[data.uuid] = instance

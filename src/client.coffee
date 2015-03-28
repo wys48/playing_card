@@ -1,5 +1,6 @@
 #ifdef _CLIENT_
 #
+window.debug = {}
 myapp = null
 tm.preload( ->
   # PC.Client.Card.ss = tm.asset.SpriteSheet {
@@ -35,6 +36,9 @@ tm.main( ->
       e.callback.call(e.event.target, e.event)
     myapp.__events = {}
 
+  window.debug.myapp = myapp
+  window.debug.PC = PC
+
   old_method = tm.app.BaseApp.prototype._update
   tm.app.BaseApp.prototype._update = ->
     old_method.call(this)
@@ -45,6 +49,7 @@ tm.main( ->
     myapp.__events[e.type].push({event: e, callback: callback})
 
   playScene = new PC.Client.Scenes.PlayScene()
+  myapp.playScene = playScene # FIXME
   loadingScene = new tm.ui.LoadingScene({
     assets: {
       cards: "images/cards_trump.png",

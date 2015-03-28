@@ -10,7 +10,10 @@ class PC._SIDE_.Area extends PC._SIDE_.Placeable
   @constructor
   コンストラクタ
   ###
-  constructor: ->
+  constructor: (x, y, w, h, canput = true) ->
+    @coord = new PC.Common.Coord(x + w/2, y + h/2)
+    @size = new PC.Common.Size(w, h)
+    @canput = canput
 
   ###*
   @method
@@ -18,6 +21,6 @@ class PC._SIDE_.Area extends PC._SIDE_.Placeable
   @param {PC._SIDE_.Movable} movable
   @param {Function} callback
   ###
-  canPutIn: (movable, callback) -> callback(true) # FIXME:あらゆるものを置くことが出来る
+  canPutIn: (movable, callback) -> callback(@canput)
 
   # vim:et sts=2 sw=2

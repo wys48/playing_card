@@ -23,9 +23,9 @@ do ->
       #card.sync(socket) for card in cards
     )
     socket.on("test", (properties) ->
-      console.log("server:test")
       properties.kind = Math.floor(Math.random() * 13)
       properties.area = "hoge"
+      console.log({"server:test": properties})
       c = new PC.Server.Card(properties)
       cards.push(c)
       c.setSyncDestination(io.sockets)

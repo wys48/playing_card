@@ -5,6 +5,7 @@ syncable
       card
       stack
 coord
+size
 sandbox
 playscene
 client
