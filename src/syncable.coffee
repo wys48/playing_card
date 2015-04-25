@@ -32,12 +32,17 @@ class PC._SIDE_.Syncable
   constructor: (@className) ->
 #ifdef _SERVER_
     @syncTarget or= []
-    @uuid = UUID.v4()
+    @uuid = Node_UUID.v4()
     console.log("new:#{@uuid}")
     PC._SIDE_.Syncable.map[@uuid] = this
 #endif
 #ifdef _CLIENT_
 #endif
+
+  ###*
+  JSONへの変換でUUIDに置換する
+  ###
+  toJSON: () -> {"__uuid__": @uuid}
 
   ###*
   @property
@@ -51,14 +56,38 @@ class PC._SIDE_.Syncable
 #ifdef _SERVER_
   setSyncDestination: (socket) ->
     @syncDestination = socket
+#endif
 
+#ifdef _SERVER_
   ###*
   ###
   sync: (socket) ->
     # TODO:通知して良いかの判定
     @syncDestination.emit("sync", {className: @className, uuid: @uuid, properties: @buildSyncProperties()})
-
 #endif
+
+  ###*
+  JSON経由で受信したデータのUUIDをクラス参照に変換する
+  ###
+  @convertXref: (data) ->
+    if data.__uuid__?
+      throw "hogehoge"
+    process = (item, index) =>
+      if item?.__uuid__?
+        data[index] = @map[item.__uuid__]
+        #  throw "No class instance (TODO)" unless data[index]
+      else if item instanceof Object
+        @convertXref(item)
+      null
+    if data instanceof Array
+      process(item, index) for item, index in data
+    else if data instanceof Object
+      process(value, key) for key, value of data
+    null
+
+  ###*
+  すべてのSyncableオブジェクトに対する同期を始める
+  ###
   @startSync: (socket) ->
 #ifdef _SERVER_
     socket.on("request", (data) =>
@@ -75,6 +104,7 @@ class PC._SIDE_.Syncable
       context =
         requester: socket.id  # FIXME
         callback: (result) -> res.data = result
+      PC._SIDE_.Syncable.convertXref(data.data)
       func.apply(instance, [context].concat(data.data))
       console.log("Info: response #{res}")
       socket.emit("response", res)
@@ -86,7 +116,7 @@ class PC._SIDE_.Syncable
     @req_id = 0
     @socket.on("sync", (data) =>
       instance = @map[data.uuid]
-      # TODO: replace cross references
+      PC._SIDE_.Syncable.convertXref(data.properties)
       if instance
         #  instance[key] = value for key, value of data.properties
         instance.onSync(data.properties)
@@ -105,12 +135,22 @@ class PC._SIDE_.Syncable
       console.log("no callback! (#{req_id})") unless callback
       callback(data.data) if callback
     )
+#endif
 
+#ifdef _CLIENT_
+  ###*
+  メソッドのリモート呼び出しを行う(@requestServerへの転送のみ)
+  ###
   requestServer: (event, context, data...) ->
     PC._SIDE_.Syncable.requestServer(this, event, context, data)
 
+  ###*
+  メソッドのリモート呼び出しを行う
+  ###
   @requestServer: (instance, event, context, dataArray) ->
     @req_id += 1
+    for data, i in dataArray
+      dataArray[i] = data.uuid if data instanceof PC._SIDE_.Syncable
     @requests[@req_id] = context.callback or (-> null)
     req = {id: @req_id, uuid: instance.uuid, event: event, data: dataArray}
     console.log(req)
@@ -123,5 +163,6 @@ class PC._SIDE_.Syncable
   buildSyncProperties: ->
     r = {}
     r[name] = this[name] for name in @syncTarget
+    r["xxx_test"] = this
     return r
 #endif

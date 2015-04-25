@@ -29,7 +29,7 @@ class PC._SIDE_.Movable extends PC._SIDE_.Placeable
   ###
   pick: (context) ->
 #ifdef _CLIENT_
-    @requestServer("pick", context)
+    @requestServer("pick", context, this)
 #endif
 #ifdef _SERVER_
     callback = context.callback

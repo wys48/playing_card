@@ -1,5 +1,5 @@
 #ifdef _SERVER_
-UUID = require("node-uuid")
+Node_UUID = require("node-uuid")
 do ->
   express = require("express")
   app = express()
