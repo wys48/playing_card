@@ -18,6 +18,7 @@ tm.main( ->
   socket.on("connect", ->
     socket.emit("login")
     PC.Client.Syncable.startSync(socket)
+    socket.emit("sync.request")
   )
   #  PC.Client.Syncable.sync(socket)
 

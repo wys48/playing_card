@@ -57,22 +57,22 @@ class PC._SIDE_.Placeable extends PC._SIDE_.Syncable
   @param {Function} callback
 #endif
   ###
-  bringToFront: (callback) ->
+  #  bringToFront: (callback) ->
 #ifdef _SERVER_
     #  return false
-    return true
+    #  return true
 #endif
 #ifdef _CLIENT_
-    callback or= -> null
-    return callback(false) unless @_element
-    parent = @_element.parent
-    return callback(false) unless parent
-    @requestServer("bringToFront", null, (result) =>
-      return callback(false) unless result
-      @_element.remove()
-      parent.addChild(@_element)
-      callback(true)
-    )
+    #  callback or= -> null
+    #  return callback(false) unless @_element
+    #  parent = @_element.parent
+    #  return callback(false) unless parent
+    #  @requestServer("bringToFront", null, (result) =>
+    #    return callback(false) unless result
+    #    @_element.remove()
+    #    parent.addChild(@_element)
+    #    callback(true)
+    #  )
 #endif
 
 #ifdef _CLIENT_
