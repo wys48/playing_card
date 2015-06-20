@@ -11,17 +11,17 @@ class PC._SIDE_.Card extends PC._SIDE_.Movable
   コンストラクタ
   ###
   constructor: (properties) ->
-    console.log(properties)
+    #  console.log(properties)
     super(@constructor.name)
-    @kind = properties.kind
-    @area = properties.area
 #ifdef _SERVER_
     # FIXME
+    @kind = properties.kind
+    @area = properties.area
     @x = properties.x
     @y = properties.y
 #endif
 #ifdef _CLIENT_
-    @coord = new PC.Common.Coord(properties.x, properties.y)
+    @coord = new PC.Common.Coord(0, 0)  #properties.x, properties.y)
 #endif
     @picker = null
 #ifdef _SERVER_
@@ -30,8 +30,8 @@ class PC._SIDE_.Card extends PC._SIDE_.Movable
 #ifdef _CLIENT_
     @_element = new tm.display.Sprite("cards", 79, 123)
     @_element.setBoundingType("rect")
-    @_element.setFrameIndex(@kind)
-    @_element.setPosition(@coord.x, @coord.y)
+    #  @_element.setFrameIndex(@kind)
+    #  @_element.setPosition(@coord.x, @coord.y)
     @_element._this = this
     @_element._drag = null
     @_element.strokeStyle = "black"
@@ -98,10 +98,10 @@ class PC._SIDE_.Card extends PC._SIDE_.Movable
 #ifdef _CLIENT_
   onSync: (properties) ->
     console.log({onSync: properties})
-    if (properties.kind)
+    if (properties.kind?)
       @kind = properties.kind
       @_element.setFrameIndex(@kind)
-    if (properties.x or properties.y)
+    if (properties.x? or properties.y?)
       @coord.x = properties.x or @coord.x
       @coord.y = properties.y or @coord.y
       @_element.setPosition(@coord.x, @coord.y)

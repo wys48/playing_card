@@ -80,6 +80,8 @@ class PC._SIDE_.Syncable
       if item?.__uuid__?
         data[index] = @map[item.__uuid__]
         #  throw "No class instance (TODO)" unless data[index]
+      else if item instanceof Function
+        null
       else if item instanceof Object
         @convertXref(item)
       null
@@ -98,6 +100,7 @@ class PC._SIDE_.Syncable
     socket.on("sync.request", (arg) => @onSyncRequest(socket, arg))
 #endif
 #ifdef _CLIENT_
+    @socket = socket
     socket.on("rpc.return", (arg) => @onRpcReturn(arg))
     socket.on("sync.update", (arg) => @onSyncUpdate(arg))
 #endif
@@ -138,6 +141,7 @@ class PC._SIDE_.Syncable
 
     # 実行結果の返却
     socket.emit("rpc.return", res)
+    @onSyncRequest(io.sockets)
 
   ###*
   @private
@@ -187,33 +191,39 @@ class PC._SIDE_.Syncable
         # クラス生成
         classObject = @subclasses[content.__classname__]
         throw "No class named `#{content.__classname__}'" unless classObject
-        instance = new classObject(content)
-        instance.__uuid__ = uuid
+        instance = new classObject()
+        instance.uuid = uuid
         @map[uuid] = instance
-      for key, value of content
-        # メンバの更新(ここでは敢えてXrefを変換しない)
-        continue if key.startsWith("__")
-        instance[key] = value
 
-    # 受信した全てのオブジェクトを作りおえたので、Xrefを変換する
-    for uuid of objects
-      PC._SIDE_.Syncable.convertXref(@map[uuid])
+    # 受信した全てのオブジェクトのインスタンスが仮生成できたので、Xrefを変換する
+    PC._SIDE_.Syncable.convertXref(objects)
+
+    # 更新対象オブジェクトに更新を依頼する
+    for uuid, content of objects
+      @map[uuid].onSync(content)
+
+    return
 
   ###*
   メソッドのリモート呼び出しを行う(@rpcCallへ転送)
   ###
-  rpcCall: (callback) ->
-    callee = arguments.caller.callee
+  rpcCall: (name, callback) ->
+    caller = arguments.callee.caller
+    caller_args = (i for i in caller.arguments)
     PC._SIDE_.Syncable.rpcCall(
       this,
-      callee.name,
-      callee.arguments[0],
-      callee.arguments[1..-1],
+      name,
+      caller_args[0],
+      caller_args[1..-1],
       callback
     )
 
   ###*
   メソッドのリモート呼び出しを行う
+  testA()         { testB(context, argA); }   # <= X.caller
+  testB(context)  { testC(); }                # testB == X.callee.caller (ある)
+  testC(callback) { X = arguments; }          # testC == X.callee (ある)
+
   ###
   @rpcCall: (instance, func, context, args) ->
     @nextRpcTag or= 1

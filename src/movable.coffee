@@ -29,7 +29,7 @@ class PC._SIDE_.Movable extends PC._SIDE_.Placeable
   ###
   pick: (context) ->
 #ifdef _CLIENT_
-    @rpcCall()
+    @rpcCall("pick")
 #endif
 #ifdef _SERVER_
     callback = context.callback
@@ -51,7 +51,7 @@ class PC._SIDE_.Movable extends PC._SIDE_.Placeable
   ###
   put: (context, placeable, coord) ->
 #ifdef _CLIENT_
-    @rpcCall()
+    @rpcCall("put")
 #endif
 #ifdef _SERVER_
     callback = context.callback
