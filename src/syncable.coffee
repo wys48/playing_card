@@ -61,9 +61,6 @@ class PC._SIDE_.Syncable
 #ifdef _SERVER_
   ###*
   ###
-  #  sync: (socket) ->
-  #    # TODO:通知して良いかの判定
-  #    @syncDestination.emit("sync", {className: @className, uuid: @uuid, properties: @buildSyncProperties()})
   generateJSONforUser: (user) ->
     r = @buildSyncProperties()
     r.__classname__ = @constructor.name
@@ -108,7 +105,7 @@ class PC._SIDE_.Syncable
   ###*
   @private
   ClientからのRPC要求を実行する
-  @param {io.socket}  socket    送信先ソケット
+  @param {io.socket}  socket    送信先ソケット(特定の1クライアントを指す)
   @param {String}     rpc.uuid  インスタンス(要するにthis)のUUID
   @param {String}     rpc.func  呼び出す関数名
   @param {Array}      rpc.args  引数(ただしクラス参照はUUID化されている)
@@ -141,7 +138,7 @@ class PC._SIDE_.Syncable
 
     # 実行結果の返却
     socket.emit("rpc.return", res)
-    @onSyncRequest(io.sockets)
+    @onSyncRequest(@sockets)
 
   ###*
   @private

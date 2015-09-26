@@ -15,17 +15,19 @@ class PC._SIDE_.Card extends PC._SIDE_.Movable
     super(@constructor.name)
 #ifdef _SERVER_
     # FIXME
-    @kind = properties.kind
     @area = properties.area
     @x = properties.x
     @y = properties.y
+    @isOpened = properties.isOpened or true
+    @realKind = properties.kind
 #endif
 #ifdef _CLIENT_
+    #  @kind = properties.kind
     @coord = new PC.Common.Coord(0, 0)  #properties.x, properties.y)
 #endif
     @picker = null
 #ifdef _SERVER_
-    @syncTarget.push("kind", "area", "x", "y", "picker")
+    @syncTarget.push("kind", "area", "x", "y", "picker", "zorder")
 #endif
 #ifdef _CLIENT_
     @_element = new tm.display.Sprite("cards", 79, 123)
@@ -49,6 +51,8 @@ class PC._SIDE_.Card extends PC._SIDE_.Movable
         @pick({callback: (accepted) =>
           return unless accepted
           @_drag = {x: event.pointing.x - @_element.x, y: event.pointing.y - @_element.y}
+          @_tap = event.pointing
+          @_tap.timerId = setTimeout((=> @_tap = null), TAP_THRESHOLD_MS)
           log("touchstart on " + @kind + " (" + @_drag.x + "," + @_drag.y + ")")
           @refreshBorder()
         })
@@ -61,12 +65,19 @@ class PC._SIDE_.Card extends PC._SIDE_.Movable
         y = event.pointing.y - @_drag.y
         if @_element.x != x or @_element.y != y
           @_element.setPosition(x, y)
-        log("touchmove on " + @kind)
+        #  log("touchmove on " + @kind)
       )
     )
     @_element.on('touchend', (event) =>
       myapp.eventFilter(event, =>
         return unless @_drag
+        if @_tap
+          clearTimeout(@_tap.timerId)
+          if ((@_tap.x - event.pointing.x) ** 2 + (@_tap.y - event.pointing.y) ** 2) < TAP_THRESHOLD_PX ** 2
+            # tapイベントも発生
+            log("tap!")
+            @reverse({callback: -> null})
+
         @_drag = null
         cancel = =>
           log("move canceled")
@@ -108,6 +119,17 @@ class PC._SIDE_.Card extends PC._SIDE_.Movable
     if (properties.picker != @picker)
       @picker = properties.picker
       @refreshBorder()
+    if (properties.zorder != @zorder)
+      # Zオーダー変更あり(自分の@_elementを一度親からはずす)
+      parent = @_element.parent
+      @_element.remove()
+      @zorder = properties.zorder
+      c = parent.children
+      i = null
+      for i in [0...(c.length)]
+        break if c[i]._this.zorder > @zorder
+      log("zorder:#{@zorder},newindex:#{i}")
+      parent.addChildAt(@_element, i)
 
   refreshBorder: ->
     if @_drag
@@ -124,6 +146,17 @@ class PC._SIDE_.Card extends PC._SIDE_.Movable
 
   @sandbox_run: ->
 
+#ifdef _CLIENT_
+  kind: null
+#endif
+#ifdef _SERVER_
+  @property("kind", {
+    get: ->
+      return @realKind if @isOpened
+      54
+  })
+#endif
+
   ###*
   @property {Boolean}
   カードが表向きか否か
@@ -133,9 +166,22 @@ class PC._SIDE_.Card extends PC._SIDE_.Movable
   ###*
   @method
   カードを裏返す
-  @param {Function} callback
+#ifdef _SERVER_
+  @param {PC._SIDE_.Player} context.requester
+#endif
+  @param {Function} context.callback (boolean accepted)
   ###
-  reverse: (callback) ->
+  reverse: (context) ->
+#ifdef _CLIENT_
+    @rpcCall("reverse")
+#endif
+#ifdef _SERVER_
+    callback = context.callback
+    requester = context.requester
+    return callback(false) unless @canPick(requester)
+    @isOpened = not @isOpened
+    callback(true)
+#endif
 
   ##ifdef CLIENT
   #  ###*
@@ -161,7 +207,7 @@ class PC._SIDE_.Card extends PC._SIDE_.Movable
   ###
   onPickedUp: (@picker) ->
     console.log("onPickedUp: #{@picker}")
-    @sync()
+    @bringToFront()
 
   # FIXME: placeableをちゃんと実装したうえで、onPutIn等で実装すべき
   put: (context, placeable, coord) ->
@@ -169,7 +215,6 @@ class PC._SIDE_.Card extends PC._SIDE_.Movable
       @x = coord.x
       @y = coord.y
     @picker = null
-    @sync()
     console.log("server put:" + this)
     context.callback(true)
 #endif

@@ -16,11 +16,14 @@ do ->
   cards = []
   #  cards.push(new PC.Server.Movable(1234))
   #  cards.push(new PC.Server.Movable(5678))
+  PC.Server.Syncable.sockets = io.sockets # FIXME:io.socketsをちゃんとSyncableに伝える仕組みがいりそう
 
   io.sockets.on("connection", (socket) ->
     socket.on("login", (name) ->
       console.log("server:login")
-      #card.sync(socket) for card in cards
+      # 特定のユーザログイン時、そのユーザに全カードの情報を送信する
+      # FIXME:本当はログイン成功時にユーザから要求すべき
+      PC.Server.Syncable.onSyncRequest(socket)
     )
     socket.on("test", (properties) ->
       properties.kind = Math.floor(Math.random() * 13)
@@ -28,9 +31,8 @@ do ->
       console.log({"server:test": properties})
       c = new PC.Server.Card(properties)
       cards.push(c)
-      #  c.setSyncDestination(io.sockets)
-      #  c.sync()
-      PC.Server.Syncable.sendObjects(socket, [c.uuid])
+      # 特定のカードの新規作成は、全ユーザに情報を送信する
+      PC.Server.Syncable.sendObjects(io.sockets, [c.uuid])
     )
     PC.Server.Syncable.startSync(socket)
   )

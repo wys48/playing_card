@@ -12,6 +12,10 @@ class PC._SIDE_.Placeable extends PC._SIDE_.Syncable
   constructor: ->
     super
     @_element = null
+#ifdef _SERVER_
+    # 生成時は、自動的に最前面のオブジェクトとする
+    @zorder = (@constructor.maxZorder += 1)
+#endif
 #ifdef _CLIENT_
     # @
 #endif
@@ -53,26 +57,19 @@ class PC._SIDE_.Placeable extends PC._SIDE_.Syncable
   ###*
   @method
   オブジェクトを画面の最前面に移動する
-#ifdef _CLIENT_
-  @param {Function} callback
-#endif
-  ###
-  #  bringToFront: (callback) ->
 #ifdef _SERVER_
-    #  return false
-    #  return true
+  @param {PC._SIDE_.Player} context.requester
 #endif
+  @param {Function} context.callback (boolean accepted)
+  ###
+  bringToFront: (context) ->
 #ifdef _CLIENT_
-    #  callback or= -> null
-    #  return callback(false) unless @_element
-    #  parent = @_element.parent
-    #  return callback(false) unless parent
-    #  @requestServer("bringToFront", null, (result) =>
-    #    return callback(false) unless result
-    #    @_element.remove()
-    #    parent.addChild(@_element)
-    #    callback(true)
-    #  )
+    @rpcCall("bringToFront")
+#endif
+#ifdef _SERVER_
+    callback = context?.callback
+    @zorder = (@constructor.maxZorder += 1)
+    callback?(true)
 #endif
 
 #ifdef _CLIENT_
@@ -87,6 +84,21 @@ class PC._SIDE_.Placeable extends PC._SIDE_.Syncable
   領域のキャンバス座標系サイズ
   ###
   size: null
+#endif
+
+  ###*
+  @property {Integer}
+  Zオーダー(大きいほど手前)
+  ###
+  zorder: null
+
+#ifdef _SERVER_
+  ###*
+  @static
+  @property {Integer}
+  Zオーダーの最大番号
+  ###
+  @maxZorder: 0
 #endif
 
   # vim:et sts=2 sw=2

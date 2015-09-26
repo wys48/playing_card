@@ -1,5 +1,7 @@
 #ifdef _CLIENT_
 #
+TAP_THRESHOLD_MS = 250
+TAP_THRESHOLD_PX = 10
 window.debug = {}
 myapp = null
 tm.preload( ->
@@ -15,12 +17,6 @@ tm.preload( ->
 )
 tm.main( ->
   socket = io.connect()
-  socket.on("connect", ->
-    socket.emit("login")
-    PC.Client.Syncable.startSync(socket)
-    socket.emit("sync.request")
-  )
-  #  PC.Client.Syncable.sync(socket)
 
   myapp = new tm.display.CanvasApp("#canvas")
   #  myapp.fps = 240
@@ -56,10 +52,14 @@ tm.main( ->
       cards: "images/cards_trump.png",
     },
     nextScene: ->
+      PC.Client.Syncable.startSync(socket)
+      socket.emit("login")
       playScene.getScene()
   })
-  myapp.replaceScene(loadingScene)
-  myapp.run()
+  socket.on("connect", ->
+    myapp.replaceScene(loadingScene)
+    myapp.run()
+  )
 )
 
 hookMethod = (before, original, after) ->
