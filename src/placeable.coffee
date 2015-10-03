@@ -11,7 +11,6 @@ class PC._SIDE_.Placeable extends PC._SIDE_.Syncable
   ###
   constructor: ->
     super
-    @_element = null
 #ifdef _SERVER_
     # 生成時は、自動的に最前面のオブジェクトとする
     @zorder = (@constructor.maxZorder += 1)

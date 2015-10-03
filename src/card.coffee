@@ -30,7 +30,7 @@ class PC._SIDE_.Card extends PC._SIDE_.Movable
     @syncTarget.push("kind", "area", "x", "y", "picker", "zorder")
 #endif
 #ifdef _CLIENT_
-    @_element = new tm.display.Sprite("cards", 79, 123)
+    console.log(@_element = new tm.display.Sprite("cards", 79, 123))
     @_element.setBoundingType("rect")
     #  @_element.setFrameIndex(@kind)
     #  @_element.setPosition(@coord.x, @coord.y)

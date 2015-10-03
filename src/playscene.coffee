@@ -15,6 +15,11 @@ class PC._SIDE_.Scenes.PlayScene #extends tm.app.Scene
   constructor: ->
     #  super() null
     @scene = new tm.app.Scene()
+    @scene.on("enter", =>
+      #  console.log({enter: {current: myapp.currentScene, "this": @scene, eq: myapp.currentScene == @scene}})
+      @area[0] = new PC._SIDE_.Area(100, 20, 1080, 320)
+      @area[1] = new PC._SIDE_.Area(100, 360, 1080, 320, false)
+    )
     @scene.on("touchend", (event) ->
       myapp.eventFilter(event, ->
       #  as = new tm.display.AnimationSprite(PC.Client.Card.ss)
@@ -29,8 +34,6 @@ class PC._SIDE_.Scenes.PlayScene #extends tm.app.Scene
     )
     @scene.checkHierarchy = true
     @area = []
-    @area[0] = new PC._SIDE_.Area(100, 0, 1280, 360)
-    @area[1] = new PC._SIDE_.Area(100, 360, 1280, 360, false)
 
   getScene: ->
     @scene
