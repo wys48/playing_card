@@ -17,8 +17,15 @@ class PC._SIDE_.Scenes.PlayScene #extends tm.app.Scene
     @scene = new tm.app.Scene()
     @scene.on("enter", =>
       #  console.log({enter: {current: myapp.currentScene, "this": @scene, eq: myapp.currentScene == @scene}})
-      @area[0] = new PC._SIDE_.Area(100, 20, 1080, 320)
-      @area[1] = new PC._SIDE_.Area(100, 360, 1080, 320, false)
+      # x,y,w,h,canput
+      x = 1280
+      y = 720
+      c = 140
+      @area[0] = new PC._SIDE_.Area(c, c, x-c*2, y-c*2, true) # 場
+      @area[1] = new PC._SIDE_.Area(c, y-c, x-c*2, c, true)   # S(自陣)
+      @area[2] = new PC._SIDE_.Area(c, 0, x-c*2, c, false)    # N
+      @area[3] = new PC._SIDE_.Area(0, 0, c, y, false)        # W
+      @area[4] = new PC._SIDE_.Area(x-c, 0, c, y, false)      # E
     )
     @scene.on("touchend", (event) ->
       myapp.eventFilter(event, ->

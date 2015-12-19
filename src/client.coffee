@@ -2,6 +2,11 @@
 #
 TAP_THRESHOLD_MS = 250
 TAP_THRESHOLD_PX = 10
+
+  # イベント呼び出しの優先度。数値が小さいほど先に呼び出される。
+  # ここに記載されていないイベントは優先度0として扱う。
+EVENT_PRIORITY = {touchstart: -1}
+
 window.debug = {}
 myapp = null
 tm.preload( ->
@@ -19,16 +24,21 @@ tm.main( ->
   socket = io.connect()
 
   myapp = new tm.display.CanvasApp("#canvas")
-  #  myapp.fps = 240
+
+  myapp.fps = 20
+
   myapp.background = "#208020"
-  myapp.resize(1280, 720)
+  myapp.resize(1280, 720) # 16:9
   #  myapp.fitWindow()
   myapp.__events = {}
   myapp.socket = socket
 
   myapp.postUpdate = ->
     #  console.log("baseapp.update")
-    for key,val of myapp.__events
+    keys = (k for k, v of myapp.__events)
+    keys.sort((a, b) -> (EVENT_PRIORITY[a] or 0) - (EVENT_PRIORITY[b] or 0))
+    for key in keys
+      val = myapp.__events[key]
       e = val[val.length - 1]
       e.callback.call(e.event.target, e.event)
     myapp.__events = {}
@@ -60,6 +70,11 @@ tm.main( ->
     myapp.replaceScene(loadingScene)
     myapp.run()
   )
+  $("#reset-server").click(=>
+    $("#reset-server").text("Requesting reset...")
+    socket.emit("reset-server")
+    window.setTimeout((=> window.location.reload()), 1000)
+  )
 )
 
 hookMethod = (before, original, after) ->
@@ -77,6 +92,17 @@ log = (message) ->
   logno = logno + 1
   c.append($('<option>').text(message).val(logno))
   c.val(logno)
+
+$(->
+  window.mylog = log
+
+  $(".testclicker").bind("click", (event) ->
+    log("#{this.id}::click")
+  )
+  $(".testclicker").bind("touchstart", (event) ->
+    log("#{this.id}::touchstart")
+  )
+)
 
 #endif
   # vim:et sts=2 sw=2

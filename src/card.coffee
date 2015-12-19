@@ -24,6 +24,7 @@ class PC._SIDE_.Card extends PC._SIDE_.Movable
 #ifdef _CLIENT_
     #  @kind = properties.kind
     @coord = new PC.Common.Coord(0, 0)  #properties.x, properties.y)
+    @pickEnd = null
 #endif
     @picker = null
 #ifdef _SERVER_
@@ -46,15 +47,25 @@ class PC._SIDE_.Card extends PC._SIDE_.Movable
     )
     @place = myapp.playScene.area1
 
+    @_element.on('mousedown', (event) =>
+      log("mousedownくるんかい！")
+    )
+
     @_element.on('touchstart', (event) =>
+      return if @constructor.getRequestCount() > 0
+      @pickEnd = null
+      log("touchstart pre-entry")
       myapp.eventFilter(event, =>
+        log("touchstart entry")
         @pick({callback: (accepted) =>
-          return unless accepted
-          @_drag = {x: event.pointing.x - @_element.x, y: event.pointing.y - @_element.y}
-          @_tap = event.pointing
-          @_tap.timerId = setTimeout((=> @_tap = null), TAP_THRESHOLD_MS)
-          log("touchstart on " + @kind + " (" + @_drag.x + "," + @_drag.y + ")")
-          @refreshBorder()
+          if accepted
+            @_drag = {x: event.pointing.x - @_element.x, y: event.pointing.y - @_element.y}
+            @_tap = {x: event.pointing.x, y: event.pointing.y}
+            @_tap.timerId = setTimeout((=> @_tap = null), TAP_THRESHOLD_MS)
+            log("touchstart on " + @kind + " (" + @_drag.x + "," + @_drag.y + ")")
+            @refreshBorder()
+          @pickEnd?()
+          @pickEnd = null
         })
       )
     )
@@ -69,34 +80,45 @@ class PC._SIDE_.Card extends PC._SIDE_.Movable
       )
     )
     @_element.on('touchend', (event) =>
+      return if @pickEnd
+      log("touchend pre-entry")
       myapp.eventFilter(event, =>
-        return unless @_drag
-        if @_tap
-          clearTimeout(@_tap.timerId)
-          if ((@_tap.x - event.pointing.x) ** 2 + (@_tap.y - event.pointing.y) ** 2) < TAP_THRESHOLD_PX ** 2
-            # tapイベントも発生
-            log("tap!")
-            @reverse({callback: -> null})
+        @pickEnd = =>
+          log("touchend entry")
+          return unless @_drag
+          if @_tap
+            clearTimeout(@_tap.timerId)
+            log("タップ判定 tx=#{@_tap.x} ty=#{@_tap.y} px=#{event.pointing.x} py=#{event.pointing.y}")
+            if ((@_tap.x - event.pointing.x) ** 2 + (@_tap.y - event.pointing.y) ** 2) < TAP_THRESHOLD_PX ** 2
+              # tapイベントも発生
+              log("tap!")
+              @reverse({callback: -> null})
+          else
+            log("タップ判定 タイムアウト")
 
-        @_drag = null
-        cancel = =>
-          log("move canceled")
-          @_element.setPosition(@coord.x, @coord.y)
-          @refreshBorder()
-        newCoord = new PC.Common.Coord(@_element.x, @_element.y)
-        place = (p for p in myapp.playScene.area when newCoord.hitTestRect(p.coord, p.size))[0]
-        console.log("no place") unless place
-        place or= {canPutIn: (dummy, callback) -> callback(false)}
-        place.canPutIn(this, (canputin) =>
-          newCoord = null unless canputin
-          @put({callback: (accepted) =>
-            console.log("hoge222")
-            return cancel() unless accepted
-            console.log("hoge333")
-            @place = place
-          }, null, if newCoord then {x: newCoord.x, y: newCoord.y} else null)
-        )
-        #  log("touchend on " + event.target._this.kind + " (" + event.pointing.x + "," + event.pointing.y + ")")
+          @_drag = null
+          cancel = =>
+            log("move canceled")
+            @_element.setPosition(@coord.x, @coord.y)
+            @refreshBorder()
+          newCoord = new PC.Common.Coord(@_element.x, @_element.y)
+          place = (p for p in myapp.playScene.area when newCoord.hitTestRect(p.coord, p.size))[0]
+          console.log("no place") unless place
+          place or= {canPutIn: (dummy, callback) -> callback(false)}
+          place.canPutIn(this, (canputin) =>
+            newCoord = null unless canputin
+            @put({callback: (accepted) =>
+              console.log("hoge222")
+              return cancel() unless accepted
+              console.log("hoge333")
+              @place = place
+            }, null, if newCoord then {x: newCoord.x, y: newCoord.y} else null)
+          )
+          #  log("touchend on " + event.target._this.kind + " (" + event.pointing.x + "," + event.pointing.y + ")")
+        # @pickEnd =
+        return if @constructor.getRequestCount() > 0
+        @pickEnd()
+        @pickEnd = null
       )
     )
     @_element.setInteractive(true)

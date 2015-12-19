@@ -53,6 +53,17 @@ class PC._SIDE_.Syncable
   @subclasses: {}
   @extendedBy: (subclass) -> @subclasses[subclass.name] = subclass
 
+#ifdef _CLIENT_
+  ###*
+  @static
+  @method
+  進行中のRPCの数を取得する
+  @return {number}
+  ###
+  @getRequestCount: =>
+    return Object.keys(@rpcRequests or {}).length
+#endif
+
 #ifdef _SERVER_
   #  setSyncDestination: (socket) ->
   #    @syncDestination = socket
@@ -223,6 +234,7 @@ class PC._SIDE_.Syncable
 
   ###
   @rpcCall: (instance, func, context, args) ->
+    instance.requesting = true
     @nextRpcTag or= 1
     tag = @nextRpcTag
     @nextRpcTag += 1

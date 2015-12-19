@@ -23,8 +23,8 @@ class PC._SIDE_.Area extends PC._SIDE_.Placeable
     @_element._this = this
     #  @_element.bgColor = "red"
     @_element.fillStyle = "transparent"
-    @_element.strokeStyle = "blue"
-    @_element.strokeWidth = 1
+    @_element.strokeStyle = "gray"
+    @_element.strokeWidth = 0.5
     @_element.setPosition(@coord.x, @coord.y)
     @_element.setSize(@size.w, @size.h)
     #  @_element.postDraw = (canvas) ->

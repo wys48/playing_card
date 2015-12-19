@@ -34,6 +34,9 @@ do ->
       # 特定のカードの新規作成は、全ユーザに情報を送信する
       PC.Server.Syncable.sendObjects(io.sockets, [c.uuid])
     )
+    socket.on("reset-server", =>
+      process.exit()
+    )
     PC.Server.Syncable.startSync(socket)
   )
 
