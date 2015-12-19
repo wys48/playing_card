@@ -18,6 +18,17 @@ do ->
   #  cards.push(new PC.Server.Movable(5678))
   PC.Server.Syncable.sockets = io.sockets # FIXME:io.socketsをちゃんとSyncableに伝える仕組みがいりそう
 
+  areas = []
+  do ->
+    w = 1280
+    h = 720
+    c = 140
+    areas[0] = new PC.Server.Area({_x: w/2,   _y:h/2,   _w:w-c*2, _h:h-c*2})  # 場
+    areas[1] = new PC.Server.Area({_x: w/2,   _y:h-c/2, _w:w-c*2, _h:c    })  # S
+    areas[2] = new PC.Server.Area({_x: w/2,   _y:c/2,   _w:w-c*2, _h:c    })  # N
+    areas[3] = new PC.Server.Area({_x: c/2,   _y:h/2,   _w:c,     _h:h    })  # W
+    areas[4] = new PC.Server.Area({_x: w-c/2, _y:h/2,   _w:c,     _h:h    })  # E
+
   io.sockets.on("connection", (socket) ->
     socket.on("login", (name) ->
       console.log("server:login")

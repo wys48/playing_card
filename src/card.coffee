@@ -24,6 +24,7 @@ class PC._SIDE_.Card extends PC._SIDE_.Movable
 #ifdef _CLIENT_
     #  @kind = properties.kind
     @coord = new PC.Common.Coord(0, 0)  #properties.x, properties.y)
+    @size = new PC.Common.Size(16, 16)
     @pickEnd = null
 #endif
     @picker = null
@@ -102,7 +103,8 @@ class PC._SIDE_.Card extends PC._SIDE_.Movable
             @_element.setPosition(@coord.x, @coord.y)
             @refreshBorder()
           newCoord = new PC.Common.Coord(@_element.x, @_element.y)
-          place = (p for p in myapp.playScene.area when newCoord.hitTestRect(p.coord, p.size))[0]
+          placeables = PC._SIDE_.Placeable.placeables.sort((a, b) => b.zorder - a.zorder)
+          place = (p for p in placeables when newCoord.hitTestRect(p.coord, p.size))[0]
           console.log("no place") unless place
           place or= {canPutIn: (dummy, callback) -> callback(false)}
           place.canPutIn(this, (canputin) =>
@@ -135,8 +137,8 @@ class PC._SIDE_.Card extends PC._SIDE_.Movable
       @kind = properties.kind
       @_element.setFrameIndex(@kind)
     if (properties.x? or properties.y?)
-      @coord.x = properties.x or @coord.x
-      @coord.y = properties.y or @coord.y
+      @coord.x = properties.x if properties.x?
+      @coord.y = properties.y if properties.y?
       @_element.setPosition(@coord.x, @coord.y)
     if (properties.picker != @picker)
       @picker = properties.picker

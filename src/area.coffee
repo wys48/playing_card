@@ -10,12 +10,16 @@ class PC._SIDE_.Area extends PC._SIDE_.Placeable
   @constructor
   コンストラクタ
   ###
-  constructor: (x, y, w, h, canput = true) ->
-    super
-    @coord = new PC.Common.Coord(x + w/2, y + h/2)
-    @size = new PC.Common.Size(w, h)
-    @canput = canput
+  constructor: (properties) ->
+    super(@constructor.name)
+#ifdef _SERVER_
+    {@_x, @_y, @_w, @_h} = properties
+    @syncTarget.push("_x", "_y", "_w", "_h", "zorder")
+#endif
 #ifdef _CLIENT_
+    @coord = new PC.Common.Coord(0, 0)
+    @size = new PC.Common.Size(0, 0)
+    @canput = true  # FIXME
     console.log(@_element = new tm.display.RoundRectangleShape())
     @_element.setBoundingType("rect")
     #  @_element.setFrameIndex(@kind)
@@ -32,6 +36,31 @@ class PC._SIDE_.Area extends PC._SIDE_.Placeable
     #    @drawBoundingRect(canvas, @strokeWidth)
     myapp.currentScene.addChild(@_element)
 #endif
+
+#ifdef _CLIENT_
+  onSync: (properties) ->
+    if (properties._x? or properties._y?)
+      @coord.x = properties._x if properties._x?
+      @coord.y = properties._y if properties._y?
+      @_element.setPosition(@coord.x, @coord.y)
+    if (properties._w? or properties._h?)
+      @size.w = properties._w if properties._w?
+      @size.h = properties._h if properties._h?
+      @_element.setSize(@size.w, @size.h)
+    if (properties.zorder != @zorder)
+      # Zオーダー変更あり(自分の@_elementを一度親からはずす)
+      parent = @_element.parent
+      @_element.remove()
+      @zorder = properties.zorder
+      c = parent.children
+      i = null
+      for i in [0...(c.length)]
+        break if c[i]._this.zorder > @zorder
+      log("zorder:#{@zorder},newindex:#{i}")
+      parent.addChildAt(@_element, i)
+#endif
+
+  PC._SIDE_.Syncable.extendedBy(this)
 
   ###*
   @method

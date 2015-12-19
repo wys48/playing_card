@@ -2,6 +2,7 @@ PC = {} unless PC?
 PC._SIDE_ = {} unless PC._SIDE_?
 
 class PC._SIDE_.Placeable extends PC._SIDE_.Syncable
+  self = this
   ###*
   @class PC._SIDE_.Placeable
   移動可能オブジェクトを置くことのできるクラスの基底(_SIDE_ 側)
@@ -11,13 +12,21 @@ class PC._SIDE_.Placeable extends PC._SIDE_.Syncable
   ###
   constructor: ->
     super
+    self.placeables.push(this)
+#ifdef _CLIENT_
+    @coord = null
+    @size = null
+#endif
+    @zorder = null
 #ifdef _SERVER_
     # 生成時は、自動的に最前面のオブジェクトとする
-    @zorder = (@constructor.maxZorder += 1)
+    @zorder = (self.maxZorder += 1)
 #endif
 #ifdef _CLIENT_
     # @
 #endif
+
+  @placeables: []
 
   PC._SIDE_.Syncable.extendedBy(this)
 
@@ -76,20 +85,20 @@ class PC._SIDE_.Placeable extends PC._SIDE_.Syncable
   @property {PC.Common.Coord}
   領域中心点のキャンバス座標
   ###
-  coord: null
+  #  coord: null
 
   ###*
   @property {PC.Common.Size}
   領域のキャンバス座標系サイズ
   ###
-  size: null
+  #  size: null
 #endif
 
   ###*
   @property {Integer}
   Zオーダー(大きいほど手前)
   ###
-  zorder: null
+  #  zorder: null
 
 #ifdef _SERVER_
   ###*

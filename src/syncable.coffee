@@ -254,6 +254,7 @@ class PC._SIDE_.Syncable
   buildSyncProperties: ->
     r = {}
     r[name] = this[name] for name in @syncTarget
-    r["xxx_test"] = this
+    #  console.log({class: @constructor.name, syncTarget: @syncTarget})
+    # r["xxx_test"] = this
     return r
 #endif
