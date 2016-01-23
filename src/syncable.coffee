@@ -73,7 +73,7 @@ class PC._SIDE_.Syncable
   ###*
   ###
   generateJSONforUser: (user) ->
-    r = @buildSyncProperties()
+    r = @buildSyncProperties(user)
     r.__classname__ = @constructor.name
     return r
 #endif
@@ -149,7 +149,8 @@ class PC._SIDE_.Syncable
 
     # 実行結果の返却
     socket.emit("rpc.return", res)
-    @onSyncRequest(@sockets)
+    # @onSyncRequest(@sockets)  # FIXME:全部のオブジェクトを送信(冗長)
+    @sendObjects(@sockets, [rpc.uuid])
 
   ###*
   @private
@@ -167,6 +168,10 @@ class PC._SIDE_.Syncable
   @param {String[]}   uuids   送信するオブジェクトのUUIDの配列
   ###
   @sendObjects: (socket, uuids) ->
+    if socket.sockets?
+      # これはio.socketsだ。
+      @sendObjects(sockobj, uuids) for sid,sockobj of socket.sockets
+      return
     data = {}
     for uuid in uuids
       instance = @map[uuid]
@@ -251,7 +256,7 @@ class PC._SIDE_.Syncable
 #ifdef _SERVER_
   ###*
   ###
-  buildSyncProperties: ->
+  buildSyncProperties: (user) ->
     r = {}
     r[name] = this[name] for name in @syncTarget
     #  console.log({class: @constructor.name, syncTarget: @syncTarget})

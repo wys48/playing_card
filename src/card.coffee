@@ -1,5 +1,7 @@
 PC = {} unless PC?
 PC._SIDE_ = {} unless PC._SIDE_?
+URA_KIND = 54
+UNK_KIND = 67
 
 class PC._SIDE_.Card extends PC._SIDE_.Movable
   ###*
@@ -18,7 +20,7 @@ class PC._SIDE_.Card extends PC._SIDE_.Movable
     @area = properties.area
     @x = properties.x
     @y = properties.y
-    @isOpened = properties.isOpened or true
+    @isOpened = if properties.isOpened? then properties.isOpened else true
     @realKind = properties.kind
 #endif
 #ifdef _CLIENT_
@@ -104,17 +106,21 @@ class PC._SIDE_.Card extends PC._SIDE_.Movable
             @refreshBorder()
           newCoord = new PC.Common.Coord(@_element.x, @_element.y)
           placeables = PC._SIDE_.Placeable.placeables.sort((a, b) => b.zorder - a.zorder)
-          place = (p for p in placeables when newCoord.hitTestRect(p.coord, p.size))[0]
+          place = (p for p in placeables when p != this and newCoord.hitTestRect(p.coord, p.size))[0]
           console.log("no place") unless place
-          place or= {canPutIn: (dummy, callback) -> callback(false)}
+          place or= {
+            canPutIn: (dummy, callback) -> callback(false)
+            uuid: "invalid_uuid"
+          }
           place.canPutIn(this, (canputin) =>
             newCoord = null unless canputin
+            console.log("put into:#{place.uuid}")
             @put({callback: (accepted) =>
-              console.log("hoge222")
+              #  console.log("hoge222")
               return cancel() unless accepted
-              console.log("hoge333")
-              @place = place
-            }, null, if newCoord then {x: newCoord.x, y: newCoord.y} else null)
+              #  console.log("hoge333")
+              #  @place = place
+            }, place, if newCoord then {x: newCoord.x, y: newCoord.y} else null)
           )
           #  log("touchend on " + event.target._this.kind + " (" + event.pointing.x + "," + event.pointing.y + ")")
         # @pickEnd =
@@ -143,6 +149,8 @@ class PC._SIDE_.Card extends PC._SIDE_.Movable
     if (properties.picker != @picker)
       @picker = properties.picker
       @refreshBorder()
+    if (properties.area?)
+      @area = properties.area
     if (properties.zorder != @zorder)
       # Zオーダー変更あり(自分の@_elementを一度親からはずす)
       parent = @_element.parent
@@ -177,8 +185,30 @@ class PC._SIDE_.Card extends PC._SIDE_.Movable
   @property("kind", {
     get: ->
       return @realKind if @isOpened
-      54
+      URA_KIND
   })
+
+  @property("hidden_kind", {
+    get: ->
+      return UNK_KIND if @isOpened
+      URA_KIND
+  })
+
+  @property("reversed_kind", {
+    get: ->
+      return @realKind unless @isOpened
+      URA_KIND
+  })
+
+  buildSyncProperties: (user) ->
+    throw "#{Error().stack}" unless user?
+    r = super(user)
+    console.log("****check**** #{user},#{@area.userid},#{@realKind},#{@isOpened}")
+    if @area.userid? and @area.userid != user
+      console.log("****hidden**** #{@area.userid} != #{user} (#{@hidden_kind})")
+      r.kind = @hidden_kind
+      # r.kind = @reversed_kind
+    return r
 #endif
 
   ###*
@@ -239,7 +269,8 @@ class PC._SIDE_.Card extends PC._SIDE_.Movable
       @x = coord.x
       @y = coord.y
     @picker = null
-    console.log("server put:" + this)
+    @area = placeable
+    console.log("placed into: #{@area}")
     context.callback(true)
 #endif
 

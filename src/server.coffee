@@ -18,6 +18,7 @@ do ->
   #  cards.push(new PC.Server.Movable(5678))
   PC.Server.Syncable.sockets = io.sockets # FIXME:io.socketsをちゃんとSyncableに伝える仕組みがいりそう
 
+  users = {}
   areas = []
   do ->
     w = 1280
@@ -29,16 +30,45 @@ do ->
     areas[3] = new PC.Server.Area({_x: c/2,   _y:h/2,   _w:c,     _h:h    })  # W
     areas[4] = new PC.Server.Area({_x: w-c/2, _y:h/2,   _w:c,     _h:h    })  # E
 
+  do ->
+    d = [0...52]
+    r = d.map(Math.random)
+    d.sort((a, b) -> r[a] - r[b])
+    for i in [0...52]
+      p = {}
+      p.kind = d[i]
+      p.area = areas[0]
+      p.isOpened = false
+      p.x = p.area._x + (p.area._w / 13) * ((i % 13) - 6)
+      p.y = p.area._y + (p.area._h / 4) * ((i // 13) - 1.5)
+      c = new PC.Server.Card(p)
+      cards.push(c)
+
   io.sockets.on("connection", (socket) ->
     socket.on("login", (name) ->
-      console.log("server:login")
+      id = socket.id
+      console.log("server:login(who=#{id})")
+
+      unless users[id]
+        users[id] = {
+          socket: socket
+          name: name
+          seat: ((k for k,v of users).length & 3) + 1 # 4人分(S,N,W,E)
+        }
+        area = areas[users[id].seat]
+        area.userid = id
+        PC.Server.Syncable.sendObjects(io.sockets, [area.uuid])
+
+      SN = [null,"S","N","W","E"]
+      console.log("users:#{("#{SN[v.seat]}=#{k}" for k,v of users).join(", ")}")
       # 特定のユーザログイン時、そのユーザに全カードの情報を送信する
       # FIXME:本当はログイン成功時にユーザから要求すべき
       PC.Server.Syncable.onSyncRequest(socket)
     )
     socket.on("test", (properties) ->
+      return
       properties.kind = Math.floor(Math.random() * 13)
-      properties.area = "hoge"
+      properties.area = areas[0]
       console.log({"server:test": properties})
       c = new PC.Server.Card(properties)
       cards.push(c)

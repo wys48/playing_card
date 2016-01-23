@@ -67,6 +67,8 @@ tm.main( ->
       playScene.getScene()
   })
   socket.on("connect", ->
+    myapp.selfid = socket.socket.sessionid
+    $("#self").text("#{myapp.selfid}")
     myapp.replaceScene(loadingScene)
     myapp.run()
   )

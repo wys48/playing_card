@@ -14,7 +14,7 @@ class PC._SIDE_.Area extends PC._SIDE_.Placeable
     super(@constructor.name)
 #ifdef _SERVER_
     {@_x, @_y, @_w, @_h} = properties
-    @syncTarget.push("_x", "_y", "_w", "_h", "zorder")
+    @syncTarget.push("_x", "_y", "_w", "_h", "zorder", "userid")
 #endif
 #ifdef _CLIENT_
     @coord = new PC.Common.Coord(0, 0)
@@ -58,6 +58,15 @@ class PC._SIDE_.Area extends PC._SIDE_.Placeable
         break if c[i]._this.zorder > @zorder
       log("zorder:#{@zorder},newindex:#{i}")
       parent.addChildAt(@_element, i)
+    if (properties.userid?)
+      @userid = properties.userid
+      switch @userid
+        when myapp.selfid
+          @_element.fillStyle = tm.graphics.Color.createStyleRGBA( 73, 111, 199, 1.0)
+        when undefined
+          @_element.fillStyle = "transparent"
+        else
+          @_element.fillStyle = tm.graphics.Color.createStyleRGBA(199,  73,  73, 1.0)
 #endif
 
   PC._SIDE_.Syncable.extendedBy(this)
